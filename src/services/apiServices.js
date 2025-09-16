@@ -287,6 +287,7 @@ export const authService = {
 // ====================================
 // 📊 SERVICIO DE DASHBOARD Y ESTADÍSTICAS
 // ====================================
+
 export const dashboardService = {
   /**
    * Obtener estadísticas generales del dashboard
@@ -680,6 +681,7 @@ export const visitorServiceFormData = {
 // ====================================
 // 🚪 SERVICIO DE VISITAS (Versión básica si no existe)
 // ====================================
+
 export const visitService = {
   /**
    * Obtener todas las visitas
@@ -874,52 +876,106 @@ export const preRegisterService = {
     try {
       console.log("📝 Creating pre-register:", preRegisterData);
 
-      // Transformar datos para que coincidan con el esquema del backend
-      const transformedData = {
-        visitor_name: preRegisterData.visitor_name,
-        email: preRegisterData.email,
-        phone: preRegisterData.phone,
-        company: preRegisterData.company || null,
-        identification: preRegisterData.identification,
-        identification_number: preRegisterData.identification_number,
-        visit_date: preRegisterData.visit_date,
-        visit_time: preRegisterData.visit_time,
-        purpose: preRegisterData.purpose,
-        host_name: preRegisterData.host_name,
-        host_email: preRegisterData.host_email,
-        estimated_duration: parseInt(preRegisterData.estimated_duration) || 60,
-        additional_notes: preRegisterData.additional_notes || null,
-      };
+      if (preRegisterData.visitor_id) {
+        // CASO 1: Ya tienes visitor_id, usar endpoint simple
+        const transformedData = {
+          visitor_id: preRegisterData.visitor_id,
+          authorizer_id: preRegisterData.authorizer_id || 1,
+          visit_purpose: preRegisterData.purpose, // ✅ Correcto
+          visit_date: preRegisterData.visit_date,
+          visit_time: this.formatTimeForBackend(preRegisterData.visit_time),
+          // CORREGIR: Convertir minutos a horas
+          expected_duration_hours: this.convertDurationToHours(preRegisterData.estimated_duration),
+          additional_notes: preRegisterData.additional_notes || null,
+        };
 
-      console.log("🔄 Transformed data:", transformedData);
+        console.log("📄 Using simple endpoint with existing visitor_id:", transformedData);
+        const response = await api.post("/pre-registrations/", transformedData);
+        console.log("✅ Pre-register created:", response.data);
+        return response.data;
+      } else {
+        // CASO 2: No tienes visitor_id, crear visitante nuevo
+        const transformedData = {
+          visitor_name: preRegisterData.visitor_name || preRegisterData.name,
+          visitor_email: preRegisterData.email || preRegisterData.visitor_email,
+          visitor_phone: preRegisterData.phone || preRegisterData.visitor_phone || "",
+          visitor_company: preRegisterData.company || null,
+          visitor_identification:
+            preRegisterData.identification || preRegisterData.visitor_identification || "",
+          authorizer_id: preRegisterData.authorizer_id || 1,
+          visit_purpose: preRegisterData.purpose || preRegisterData.visit_purpose,
+          visit_date: preRegisterData.visit_date,
+          visit_time: this.formatTimeForBackend(preRegisterData.visit_time),
+          // CORREGIR: Convertir minutos a horas
+          expected_duration_hours: this.convertDurationToHours(preRegisterData.estimated_duration),
+          additional_notes: preRegisterData.additional_notes || null,
+        };
 
-      const response = await api.post("/pre-registrations", transformedData);
-      console.log("✅ Pre-register created:", response.data);
-      return response.data;
+        console.log("📄 Using with-visitor endpoint:", transformedData);
+        const response = await api.post("/pre-registrations/with-visitor/", transformedData);
+        console.log("✅ Pre-register created:", response.data);
+        return response.data;
+      }
     } catch (error) {
       console.error("❌ Error creating pre-register:", error);
 
-      // Si hay errores de validación, mostrarlos
       if (error.response?.status === 422) {
         const validationErrors = error.response.data.detail;
         console.error("🚨 Validation errors:", validationErrors);
         throw new Error(`Errores de validación: ${validationErrors.map((e) => e.msg).join(", ")}`);
       }
 
-      console.warn("⚠️ Pre-register create endpoint failed, simulating success");
-
-      // Simular creación exitosa para desarrollo
-      const mockResult = {
-        id: Math.floor(Math.random() * 1000) + 100,
-        ...preRegisterData,
-        status: "pending",
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-
-      console.log("✅ Mock pre-register created:", mockResult);
-      return mockResult;
+      throw error;
     }
+  },
+
+  /**
+   * Convertir duración de minutos a horas
+   * @param {number|string} duration - Duración en minutos
+   * @returns {number} Duración en horas (entre 1 y 12)
+   */
+  convertDurationToHours(duration) {
+    if (!duration) return 2; // Default 2 horas
+
+    const minutes = parseInt(duration);
+    if (isNaN(minutes)) return 2;
+
+    // Convertir minutos a horas
+    let hours = Math.round(minutes / 60);
+
+    // Asegurar que esté entre 1 y 12
+    if (hours < 1) hours = 1;
+    if (hours > 12) hours = 12;
+
+    console.log(`⏱️ Converting duration: ${minutes} minutes = ${hours} hours`);
+    return hours;
+  },
+
+  /**
+   * Formatear tiempo para el backend
+   * @param {string} timeString - Tiempo en formato HH:MM
+   * @returns {string} Tiempo en formato HH:MM:SS
+   */
+  formatTimeForBackend(timeString) {
+    if (!timeString) return "00:00:00";
+
+    // Si ya tiene formato completo HH:MM:SS, devolverlo tal como está
+    if (timeString.split(":").length === 3) {
+      return timeString;
+    }
+
+    // Si tiene formato HH:MM, agregar :00
+    if (timeString.split(":").length === 2) {
+      return `${timeString}:00`;
+    }
+
+    // Si es solo HH, agregar :00:00
+    if (timeString.split(":").length === 1) {
+      return `${timeString.padStart(2, "0")}:00:00`;
+    }
+
+    // Fallback
+    return "00:00:00";
   },
 
   /**
@@ -1130,6 +1186,132 @@ export const preRegisterService = {
     }
 
     return filteredData;
+  },
+};
+
+// ====================================
+// 👥 SERVICIO DE USUARIOS
+// ====================================
+export const userService = {
+  /**
+   * Obtener todos los usuarios
+   * @returns {Promise<Array>} Lista de usuarios
+   */
+  async getAll() {
+    try {
+      console.log("👥 Loading users");
+      const response = await api.get("/users/");
+      console.log("✅ Users loaded:", response.data?.length || 0);
+      return response.data;
+    } catch (error) {
+      console.warn("⚠️ Users endpoint not available, using mock data");
+      return this.getMockUsers();
+    }
+  },
+
+  /**
+   * Obtener solo usuarios autorizadores
+   * @returns {Promise<Array>} Lista de autorizadores
+   */
+  async getAuthorizers() {
+    try {
+      console.log("👥 Loading authorizers");
+      const response = await api.get("/users/authorizers");
+      console.log("✅ Authorizers loaded:", response.data?.length || 0);
+      return response.data;
+    } catch (error) {
+      console.warn("⚠️ Authorizers endpoint not available, using mock data");
+      return this.getMockAuthorizers();
+    }
+  },
+
+  /**
+   * Obtener usuario por ID
+   * @param {number} id - ID del usuario
+   * @returns {Promise<Object>} Usuario
+   */
+  async getById(id) {
+    try {
+      console.log(`👥 Getting user ${id}`);
+      const response = await api.get(`/users/${id}`);
+      return response.data;
+    } catch (error) {
+      console.warn(`⚠️ User ${id} endpoint not available`);
+      throw new Error("Usuario no encontrado");
+    }
+  },
+
+  /**
+   * Datos mock para desarrollo - Autorizadores
+   */
+  getMockAuthorizers() {
+    return [
+      {
+        id: 1,
+        full_name: "Jorge Mendez",
+        email: "jorge.mendez@empresa.com",
+        department: "Recursos Humanos",
+        position: "Gerente de RRHH",
+        phone: "+52 55 1234 5678",
+        is_authorizer: true,
+        is_admin: false,
+        is_active: true,
+      },
+      {
+        id: 2,
+        full_name: "Sofia Castro",
+        email: "sofia.castro@empresa.com",
+        department: "Operaciones",
+        position: "Directora de Operaciones",
+        phone: "+52 55 2345 6789",
+        is_authorizer: true,
+        is_admin: true,
+        is_active: true,
+      },
+      {
+        id: 3,
+        full_name: "Ricardo Morales",
+        email: "ricardo.morales@empresa.com",
+        department: "Tecnología",
+        position: "CTO",
+        phone: "+52 55 3456 7890",
+        is_authorizer: true,
+        is_admin: false,
+        is_active: true,
+      },
+      {
+        id: 4,
+        full_name: "Ana Gutierrez",
+        email: "ana.gutierrez@empresa.com",
+        department: "Seguridad",
+        position: "Jefe de Seguridad",
+        phone: "+52 55 4567 8901",
+        is_authorizer: true,
+        is_admin: false,
+        is_active: true,
+      },
+    ];
+  },
+
+  /**
+   * Datos mock para desarrollo - Todos los usuarios
+   */
+  getMockUsers() {
+    const authorizers = this.getMockAuthorizers();
+    const regularUsers = [
+      {
+        id: 5,
+        full_name: "Carlos Lopez",
+        email: "carlos.lopez@empresa.com",
+        department: "Contabilidad",
+        position: "Contador",
+        phone: "+52 55 5678 9012",
+        is_authorizer: false,
+        is_admin: false,
+        is_active: true,
+      },
+    ];
+    return [...authorizers, ...regularUsers];
   },
 };
 

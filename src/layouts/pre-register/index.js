@@ -28,11 +28,8 @@ import {
   Avatar,
   Divider,
   Paper,
-  RadioGroup,
+  Box,
   Radio,
-  FormControl,
-  FormLabel,
-  FormControlLabel,
 } from "@mui/material";
 
 // Material Dashboard 2 React components
@@ -47,242 +44,16 @@ import DashboardNavbar from "examples/Navbars/DashboardNavbar";
 import Footer from "examples/Footer";
 
 // Servicios de API
-import { preRegisterService, visitorService } from "../../services/apiServices";
-
-// Componente de Selección de Visitante
-const VisitorSelector = ({ selectedVisitorId, onVisitorSelect, onCancel }) => {
-  const [visitors, setVisitors] = useState([]);
-  const [filteredVisitors, setFilteredVisitors] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
-
-  useEffect(() => {
-    loadVisitors();
-  }, []);
-
-  useEffect(() => {
-    handleSearch();
-  }, [searchTerm, visitors]);
-
-  const loadVisitors = async () => {
-    setLoading(true);
-    try {
-      const data = await visitorService.getAll();
-      console.log("Visitantes cargados para selección:", data);
-      setVisitors(Array.isArray(data) ? data : []);
-    } catch (error) {
-      console.error("Error loading visitors for selection:", error);
-      setVisitors([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSearch = () => {
-    if (!searchTerm.trim()) {
-      setFilteredVisitors(visitors);
-      return;
-    }
-
-    const filtered = visitors.filter(
-      (visitor) =>
-        visitor.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        visitor.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (visitor.company && visitor.company.toLowerCase().includes(searchTerm.toLowerCase()))
-    );
-
-    setFilteredVisitors(filtered);
-    setPage(0);
-  };
-
-  const handleChangePage = (event, newPage) => {
-    setPage(newPage);
-  };
-
-  const handleChangeRowsPerPage = (event) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
-  };
-
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString("es-MX", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  };
-
-  const paginatedVisitors = filteredVisitors.slice(
-    page * rowsPerPage,
-    page * rowsPerPage + rowsPerPage
-  );
-
-  return (
-    <>
-      <DialogContent sx={{ minWidth: "800px", minHeight: "600px" }}>
-        <MDBox sx={{ mb: 3 }}>
-          <MDTypography variant="body2" color="text">
-            Selecciona un visitante de la lista o busca por nombre, email o empresa
-          </MDTypography>
-        </MDBox>
-
-        {/* Búsqueda */}
-        <MDBox sx={{ mb: 3 }}>
-          <MDInput
-            type="text"
-            label="Buscar visitante..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            fullWidth
-            InputProps={{
-              startAdornment: <Icon>search</Icon>,
-            }}
-            placeholder="Nombre, email o empresa"
-          />
-        </MDBox>
-
-        {/* Tabla de visitantes */}
-        <Paper elevation={2} sx={{ mb: 3 }}>
-          <TableContainer sx={{ maxHeight: 400 }}>
-            <Table stickyHeader>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Seleccionar</TableCell>
-                  <TableCell>Visitante</TableCell>
-                  <TableCell>Email</TableCell>
-                  <TableCell>Empresa</TableCell>
-                  <TableCell>Identificación</TableCell>
-                  <TableCell>Registro</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {loading ? (
-                  <TableRow>
-                    <TableCell colSpan={6} align="center">
-                      <MDTypography variant="body2" color="text">
-                        Cargando visitantes...
-                      </MDTypography>
-                    </TableCell>
-                  </TableRow>
-                ) : paginatedVisitors.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} align="center">
-                      <MDTypography variant="body2" color="text">
-                        {searchTerm
-                          ? "No se encontraron visitantes con ese criterio"
-                          : "No hay visitantes registrados"}
-                      </MDTypography>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  paginatedVisitors.map((visitor) => (
-                    <TableRow
-                      key={visitor.id}
-                      hover
-                      selected={selectedVisitorId === visitor.id}
-                      sx={{ cursor: "pointer" }}
-                      onClick={() => onVisitorSelect(visitor)}
-                    >
-                      <TableCell>
-                        <Radio
-                          checked={selectedVisitorId === visitor.id}
-                          onChange={() => onVisitorSelect(visitor)}
-                          value={visitor.id}
-                          name="visitor-selection"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <MDBox display="flex" alignItems="center">
-                          <Avatar sx={{ mr: 2, width: 32, height: 32 }} src={visitor.photo_url}>
-                            {visitor.full_name?.charAt(0) || "?"}
-                          </Avatar>
-                          <MDBox>
-                            <MDTypography variant="body2" fontWeight="medium">
-                              {visitor.full_name || "Sin nombre"}
-                            </MDTypography>
-                            <MDTypography variant="caption" color="text">
-                              {visitor.phone || "Sin teléfono"}
-                            </MDTypography>
-                          </MDBox>
-                        </MDBox>
-                      </TableCell>
-                      <TableCell>
-                        <MDTypography variant="body2">{visitor.email || "Sin email"}</MDTypography>
-                      </TableCell>
-                      <TableCell>
-                        <MDTypography variant="body2">
-                          {visitor.company || "Sin empresa"}
-                        </MDTypography>
-                      </TableCell>
-                      <TableCell>
-                        <MDBox>
-                          <MDTypography variant="body2" fontWeight="medium">
-                            {visitor.identification || "Sin ID"}
-                          </MDTypography>
-                          <MDTypography variant="caption" color="text">
-                            {visitor.no_identification || "Sin número"}
-                          </MDTypography>
-                        </MDBox>
-                      </TableCell>
-                      <TableCell>
-                        <MDTypography variant="caption" color="text">
-                          {visitor.created_at ? formatDate(visitor.created_at) : "Sin fecha"}
-                        </MDTypography>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
-
-          {/* Paginación */}
-          <TablePagination
-            component="div"
-            count={filteredVisitors.length}
-            page={page}
-            onPageChange={handleChangePage}
-            rowsPerPage={rowsPerPage}
-            onRowsPerPageChange={handleChangeRowsPerPage}
-            rowsPerPageOptions={[5, 10, 25]}
-            labelRowsPerPage="Filas por página:"
-            labelDisplayedRows={({ from, to, count }) =>
-              `${from}–${to} de ${count !== -1 ? count : `más de ${to}`}`
-            }
-          />
-        </Paper>
-      </DialogContent>
-
-      <DialogActions>
-        <MDButton onClick={onCancel} variant="outlined" color="secondary">
-          Cancelar
-        </MDButton>
-        <MDButton
-          onClick={() => {
-            const visitorToSelect = visitors.find((v) => v.id === selectedVisitorId);
-            console.log("Confirmando selección de visitante:", visitorToSelect);
-            if (visitorToSelect) {
-              onVisitorSelect(visitorToSelect);
-            }
-          }}
-          variant="gradient"
-          color="primary"
-          disabled={!selectedVisitorId}
-        >
-          Seleccionar Visitante
-        </MDButton>
-      </DialogActions>
-    </>
-  );
-};
+import { preRegisterService, visitorService, userService } from "../../services/apiServices";
 
 // Componente del Formulario Principal
 const PreRegisterForm = ({ preRegister, onSave, onCancel, isEdit = false }) => {
   const [selectedVisitor, setSelectedVisitor] = useState(null);
+  const [selectedAuthorizer, setSelectedAuthorizer] = useState(null);
+  const [visitors, setVisitors] = useState([]);
   const [authorizers, setAuthorizers] = useState([]);
-  const [showVisitorSelector, setShowVisitorSelector] = useState(false);
+  const [loadingVisitors, setLoadingVisitors] = useState(false);
+  const [loadingAuthorizers, setLoadingAuthorizers] = useState(false);
 
   const [formData, setFormData] = useState({
     visitor_id: null,
@@ -299,6 +70,7 @@ const PreRegisterForm = ({ preRegister, onSave, onCancel, isEdit = false }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
+    loadVisitors();
     loadAuthorizers();
     if (!isEdit) {
       const tomorrow = new Date();
@@ -311,16 +83,31 @@ const PreRegisterForm = ({ preRegister, onSave, onCancel, isEdit = false }) => {
     }
   }, [isEdit]);
 
-  const loadAuthorizers = async () => {
+  const loadVisitors = async () => {
+    setLoadingVisitors(true);
     try {
-      // Simulando carga de autorizadores - reemplazar con API real
-      setAuthorizers([
-        { id: 2, name: "Jorge Mendez", email: "jorge.mendez@empresa.com" },
-        { id: 3, name: "Sofia Castro", email: "sofia.castro@empresa.com" },
-        { id: 4, name: "Luis Hernandez", email: "luis.hernandez@empresa.com" },
-      ]);
+      const data = await visitorService.getAll();
+      console.log("Visitantes cargados:", data);
+      setVisitors(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("Error loading visitors:", error);
+      setVisitors([]);
+    } finally {
+      setLoadingVisitors(false);
+    }
+  };
+
+  const loadAuthorizers = async () => {
+    setLoadingAuthorizers(true);
+    try {
+      const data = await userService.getAuthorizers();
+      console.log("Autorizadores cargados:", data);
+      setAuthorizers(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Error loading authorizers:", error);
+      setAuthorizers([]);
+    } finally {
+      setLoadingAuthorizers(false);
     }
   };
 
@@ -333,16 +120,30 @@ const PreRegisterForm = ({ preRegister, onSave, onCancel, isEdit = false }) => {
     }
   };
 
-  const handleVisitorSelect = (visitor) => {
-    if (visitor) {
-      console.log("Visitante seleccionado:", visitor);
-      setSelectedVisitor(visitor);
-      setFormData((prev) => ({
-        ...prev,
-        visitor_id: visitor.id,
-      }));
+  const handleVisitorSelect = (event, newValue) => {
+    console.log("Visitante seleccionado:", newValue);
+    setSelectedVisitor(newValue);
+    setFormData((prev) => ({
+      ...prev,
+      visitor_id: newValue?.id || null,
+    }));
+
+    if (errors.visitor_id) {
+      setErrors((prev) => ({ ...prev, visitor_id: "" }));
     }
-    setShowVisitorSelector(false);
+  };
+
+  const handleAuthorizerSelect = (event, newValue) => {
+    console.log("Autorizador seleccionado:", newValue);
+    setSelectedAuthorizer(newValue);
+    setFormData((prev) => ({
+      ...prev,
+      authorizer_id: newValue?.id || null,
+    }));
+
+    if (errors.authorizer_id) {
+      setErrors((prev) => ({ ...prev, authorizer_id: "" }));
+    }
   };
 
   const validateForm = () => {
@@ -381,11 +182,10 @@ const PreRegisterForm = ({ preRegister, onSave, onCancel, isEdit = false }) => {
     try {
       const submitData = {
         visitor_id: formData.visitor_id,
+        authorizer_id: formData.authorizer_id,
         visit_date: formData.visit_date,
         visit_time: formData.visit_time,
         purpose: formData.visit_purpose.trim(),
-        host_name: authorizers.find((a) => a.id === formData.authorizer_id)?.name || "",
-        host_email: authorizers.find((a) => a.id === formData.authorizer_id)?.email || "",
         estimated_duration: parseInt(formData.expected_duration_hours) * 60,
         additional_notes: formData.additional_notes.trim() || null,
       };
@@ -405,74 +205,84 @@ const PreRegisterForm = ({ preRegister, onSave, onCancel, isEdit = false }) => {
         <DialogContent data-testid="preregister-dialog" id="preregister-dialog-description">
           <MDBox component="div" sx={{ pt: 2 }}>
             <Grid container spacing={3}>
-              {/* Información del Visitante */}
+              {/* Selección de Visitante */}
               <Grid item xs={12}>
                 <MDTypography variant="h6" color="primary">
                   Selección de Visitante
                 </MDTypography>
-                <MDTypography variant="body2" color="text" sx={{ mt: 1 }}>
-                  Los pre-registros requieren seleccionar un visitante existente en el sistema
+                <MDTypography variant="body2" color="text" sx={{ mt: 1, mb: 2 }}>
+                  Selecciona un visitante registrado en el sistema
                 </MDTypography>
               </Grid>
 
               <Grid item xs={12}>
-                {selectedVisitor ? (
-                  <Paper elevation={1} sx={{ p: 2 }}>
-                    <MDBox display="flex" alignItems="center" justifyContent="space-between">
-                      <MDBox display="flex" alignItems="center">
-                        <Avatar
-                          sx={{ mr: 2, width: 40, height: 40 }}
-                          src={selectedVisitor.photo_url}
-                        >
-                          {selectedVisitor.full_name?.charAt(0) || "?"}
-                        </Avatar>
-                        <MDBox>
-                          <MDTypography variant="body2" fontWeight="medium">
-                            {selectedVisitor.full_name}
-                          </MDTypography>
-                          <MDTypography variant="caption" color="text">
-                            {selectedVisitor.email} • {selectedVisitor.company || "Sin empresa"}
-                          </MDTypography>
-                          <MDTypography variant="caption" color="text" display="block">
-                            Tel: {selectedVisitor.phone || "No especificado"} • ID:{" "}
-                            {selectedVisitor.identification} - {selectedVisitor.no_identification}
-                          </MDTypography>
-                        </MDBox>
+                <Autocomplete
+                  options={visitors}
+                  getOptionLabel={(option) =>
+                    `${option.full_name} - ${option.identification}: ${option.no_identification}`
+                  }
+                  value={selectedVisitor}
+                  onChange={handleVisitorSelect}
+                  loading={loadingVisitors}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Seleccionar Visitante"
+                      error={!!errors.visitor_id}
+                      helperText={errors.visitor_id}
+                      required
+                      placeholder="Buscar por nombre o identificación"
+                    />
+                  )}
+                  renderOption={(props, option) => (
+                    <Box component="li" {...props}>
+                      <Avatar sx={{ mr: 2, width: 32, height: 32 }} src={option.photo_url}>
+                        {option.full_name?.charAt(0) || "?"}
+                      </Avatar>
+                      <Box>
+                        <MDTypography variant="body2" fontWeight="medium">
+                          {option.full_name}
+                        </MDTypography>
+                        <MDTypography variant="caption" color="text">
+                          {option.identification}: {option.no_identification}
+                        </MDTypography>
+                      </Box>
+                    </Box>
+                  )}
+                />
+              </Grid>
+
+              {/* Información del Visitante Seleccionado */}
+              {selectedVisitor && (
+                <Grid item xs={12}>
+                  <Paper
+                    elevation={1}
+                    sx={{
+                      p: 2,
+                      backgroundColor: "#f8f9fa",
+                      border: "1px solid #e9ecef",
+                    }}
+                  >
+                    <MDBox display="flex" alignItems="center">
+                      <Avatar sx={{ mr: 2, width: 50, height: 50 }} src={selectedVisitor.photo_url}>
+                        {selectedVisitor.full_name?.charAt(0) || "?"}
+                      </Avatar>
+                      <MDBox sx={{ flexGrow: 1 }}>
+                        <MDTypography variant="h6" fontWeight="medium">
+                          {selectedVisitor.full_name}
+                        </MDTypography>
+                        <MDTypography variant="body2" color="text">
+                          {selectedVisitor.email} • {selectedVisitor.company || "Sin empresa"}
+                        </MDTypography>
+                        <MDTypography variant="body2" color="text">
+                          Tel: {selectedVisitor.phone || "No especificado"} • ID:{" "}
+                          {selectedVisitor.identification} - {selectedVisitor.no_identification}
+                        </MDTypography>
                       </MDBox>
-                      <MDButton
-                        variant="outlined"
-                        color="primary"
-                        size="small"
-                        onClick={() => setShowVisitorSelector(true)}
-                      >
-                        Cambiar
-                      </MDButton>
                     </MDBox>
                   </Paper>
-                ) : (
-                  <MDBox>
-                    <MDButton
-                      variant="outlined"
-                      color="primary"
-                      onClick={() => setShowVisitorSelector(true)}
-                      fullWidth
-                      sx={{ py: 2 }}
-                      startIcon={<Icon>person_search</Icon>}
-                    >
-                      Seleccionar Visitante
-                    </MDButton>
-                    {errors.visitor_id && (
-                      <MDTypography
-                        variant="caption"
-                        color="error"
-                        sx={{ mt: 1, display: "block" }}
-                      >
-                        {errors.visitor_id}
-                      </MDTypography>
-                    )}
-                  </MDBox>
-                )}
-              </Grid>
+                </Grid>
+              )}
 
               {/* Información del Autorizador */}
               <Grid item xs={12}>
@@ -480,15 +290,20 @@ const PreRegisterForm = ({ preRegister, onSave, onCancel, isEdit = false }) => {
                 <MDTypography variant="h6" color="primary" sx={{ mt: 2 }}>
                   Información del Autorizador
                 </MDTypography>
+                <MDTypography variant="body2" color="text" sx={{ mt: 1, mb: 2 }}>
+                  Selecciona el empleado que autorizará la visita
+                </MDTypography>
               </Grid>
+
               <Grid item xs={12}>
                 <Autocomplete
                   options={authorizers}
-                  getOptionLabel={(option) => `${option.name} (${option.email})`}
-                  value={authorizers.find((a) => a.id === formData.authorizer_id) || null}
-                  onChange={(event, newValue) =>
-                    handleChange("authorizer_id")(newValue?.id || null)
+                  getOptionLabel={(option) =>
+                    `${option.full_name} - ${option.department || "Sin departamento"}`
                   }
+                  value={selectedAuthorizer}
+                  onChange={handleAuthorizerSelect}
+                  loading={loadingAuthorizers}
                   renderInput={(params) => (
                     <TextField
                       {...params}
@@ -496,10 +311,60 @@ const PreRegisterForm = ({ preRegister, onSave, onCancel, isEdit = false }) => {
                       error={!!errors.authorizer_id}
                       helperText={errors.authorizer_id}
                       required
+                      placeholder="Buscar por nombre o departamento"
                     />
+                  )}
+                  renderOption={(props, option) => (
+                    <Box component="li" {...props}>
+                      <Avatar sx={{ mr: 2, width: 32, height: 32 }}>
+                        {option.full_name?.charAt(0) || "?"}
+                      </Avatar>
+                      <Box>
+                        <MDTypography variant="body2" fontWeight="medium">
+                          {option.full_name}
+                        </MDTypography>
+                        <MDTypography variant="caption" color="text">
+                          {option.department || "Sin departamento"} •{" "}
+                          {option.position || "Sin posición"}
+                        </MDTypography>
+                      </Box>
+                    </Box>
                   )}
                 />
               </Grid>
+
+              {/* Información del Autorizador Seleccionado */}
+              {selectedAuthorizer && (
+                <Grid item xs={12}>
+                  <Paper
+                    elevation={1}
+                    sx={{
+                      p: 2,
+                      backgroundColor: "#f0f8ff",
+                      border: "1px solid #b3d9ff",
+                    }}
+                  >
+                    <MDBox display="flex" alignItems="center">
+                      <Avatar sx={{ mr: 2, width: 50, height: 50 }}>
+                        {selectedAuthorizer.full_name?.charAt(0) || "?"}
+                      </Avatar>
+                      <MDBox sx={{ flexGrow: 1 }}>
+                        <MDTypography variant="h6" fontWeight="medium">
+                          {selectedAuthorizer.full_name}
+                        </MDTypography>
+                        <MDTypography variant="body2" color="text">
+                          {selectedAuthorizer.email} •{" "}
+                          {selectedAuthorizer.department || "Sin departamento"}
+                        </MDTypography>
+                        <MDTypography variant="body2" color="text">
+                          {selectedAuthorizer.position || "Sin posición"} • Tel:{" "}
+                          {selectedAuthorizer.phone || "No especificado"}
+                        </MDTypography>
+                      </MDBox>
+                    </MDBox>
+                  </Paper>
+                </Grid>
+              )}
 
               {/* Información de la Visita */}
               <Grid item xs={12}>
@@ -602,26 +467,6 @@ const PreRegisterForm = ({ preRegister, onSave, onCancel, isEdit = false }) => {
           </MDButton>
         </DialogActions>
       </form>
-
-      {/* Diálogo de selección de visitante */}
-      <Dialog
-        open={showVisitorSelector}
-        onClose={() => setShowVisitorSelector(false)}
-        maxWidth="lg"
-        fullWidth
-        aria-labelledby="visitor-selector-title"
-      >
-        <DialogTitle id="visitor-selector-title">
-          <MDTypography variant="h4" fontWeight="medium">
-            Seleccionar Visitante
-          </MDTypography>
-        </DialogTitle>
-        <VisitorSelector
-          selectedVisitorId={selectedVisitor?.id || null}
-          onVisitorSelect={handleVisitorSelect}
-          onCancel={() => setShowVisitorSelector(false)}
-        />
-      </Dialog>
     </>
   );
 };
@@ -764,6 +609,33 @@ function PreRegisterManagement() {
     closeActionMenu();
   };
 
+  const handleApprove = async (preRegisterId) => {
+    try {
+      await preRegisterService.approve(preRegisterId, "Aprobado desde el panel de administración");
+      await loadPreRegisters();
+      showAlert("Pre-registro aprobado exitosamente", "success");
+    } catch (error) {
+      console.error("Error al aprobar:", error);
+      showAlert("Error al aprobar pre-registro: " + error.message, "error");
+    }
+    closeActionMenu();
+  };
+
+  const handleReject = async (preRegisterId) => {
+    const reason = prompt("Ingrese la razón del rechazo:");
+    if (reason) {
+      try {
+        await preRegisterService.reject(preRegisterId, reason);
+        await loadPreRegisters();
+        showAlert("Pre-registro rechazado", "info");
+      } catch (error) {
+        console.error("Error al rechazar:", error);
+        showAlert("Error al rechazar pre-registro: " + error.message, "error");
+      }
+    }
+    closeActionMenu();
+  };
+
   // Funciones de UI
   const showAlert = (message, severity = "success") => {
     setAlert({ show: true, message, severity });
@@ -870,10 +742,12 @@ function PreRegisterManagement() {
 
   // Datos simulados para mostrar las estadísticas
   const stats = {
-    pending: 8,
-    approved: 15,
-    today: 3,
-    thisWeek: 12,
+    pending: filteredPreRegisters.filter((pr) => pr.status === "pending").length,
+    approved: filteredPreRegisters.filter((pr) => pr.status === "approved").length,
+    today: filteredPreRegisters.filter(
+      (pr) => pr.visit_date === new Date().toISOString().split("T")[0]
+    ).length,
+    thisWeek: filteredPreRegisters.length,
   };
 
   return (
@@ -949,10 +823,10 @@ function PreRegisterManagement() {
                 <Card>
                   <MDBox p={3}>
                     <MDTypography variant="body2" color="text" gutterBottom>
-                      Esta Semana
+                      Total
                     </MDTypography>
                     <MDTypography variant="h4" fontWeight="medium">
-                      {stats.thisWeek}
+                      {filteredPreRegisters.length}
                     </MDTypography>
                   </MDBox>
                 </Card>
@@ -1045,16 +919,16 @@ function PreRegisterManagement() {
                             <TableCell>
                               <MDBox>
                                 <MDTypography variant="body2" fontWeight="medium">
-                                  {preRegister.host_name || "-"}
+                                  {preRegister.authorizer_name || "-"}
                                 </MDTypography>
                                 <MDTypography variant="caption" color="text">
-                                  {preRegister.host_email || "-"}
+                                  {preRegister.authorizer_email || "-"}
                                 </MDTypography>
                               </MDBox>
                             </TableCell>
                             <TableCell>
                               <MDTypography variant="body2">
-                                {preRegister.purpose || "-"}
+                                {preRegister.visit_purpose || preRegister.purpose || "-"}
                               </MDTypography>
                             </TableCell>
                             <TableCell>
@@ -1103,9 +977,11 @@ function PreRegisterManagement() {
                   onRowsPerPageChange={handleChangeRowsPerPage}
                   rowsPerPageOptions={[5, 10, 25, 50]}
                   labelRowsPerPage="Filas por página:"
-                  labelDisplayedRows={({ from, to, count }) =>
-                    `${from}–${to} de ${count !== -1 ? count : `más de ${to}`}`
-                  }
+                  labelDisplayedRows={(paginationInfo) => {
+                    const { from, to, count } = paginationInfo;
+                    const total = count !== -1 ? count : `más de ${to}`;
+                    return `${from}–${to} de ${total}`;
+                  }}
                 />
               </MDBox>
             </Card>
@@ -1185,14 +1061,21 @@ function PreRegisterManagement() {
           <Icon sx={{ mr: 1 }}>delete</Icon>
           Eliminar
         </MenuItem>
-        <MenuItem onClick={closeActionMenu}>
-          <Icon sx={{ mr: 1 }}>check</Icon>
-          Aprobar
-        </MenuItem>
-        <MenuItem onClick={closeActionMenu} sx={{ color: "error.main" }}>
-          <Icon sx={{ mr: 1 }}>close</Icon>
-          Rechazar
-        </MenuItem>
+        {actionMenu.preRegister?.status === "pending" && (
+          <>
+            <MenuItem onClick={() => handleApprove(actionMenu.preRegister?.id)}>
+              <Icon sx={{ mr: 1 }}>check</Icon>
+              Aprobar
+            </MenuItem>
+            <MenuItem
+              onClick={() => handleReject(actionMenu.preRegister?.id)}
+              sx={{ color: "error.main" }}
+            >
+              <Icon sx={{ mr: 1 }}>close</Icon>
+              Rechazar
+            </MenuItem>
+          </>
+        )}
       </Menu>
 
       <Footer />
