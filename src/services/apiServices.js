@@ -845,6 +845,35 @@ export const preRegisterService = {
   },
 
   /**
+   * NUEVO: Obtener pre-registros por placa de vehículo
+   * @param {string} licensePlate - Placa del vehículo
+   * @param {string} status - Estado opcional
+   * @returns {Promise<Array>} Pre-registros con esa placa
+   */
+  async getByVehicle(licensePlate, status = null) {
+    try {
+      console.log(`🚗 Getting pre-registers for vehicle: ${licensePlate}`);
+      const params = {};
+      if (status) {
+        params.status = status;
+      }
+
+      const response = await api.get(`/pre-registrations/by-vehicle/${licensePlate}`, { params });
+      console.log("✅ Pre-registers by vehicle loaded:", response.data?.length || 0);
+      return response.data;
+    } catch (error) {
+      console.warn("⚠️ Vehicle endpoint not available, filtering mock data");
+      const allData = this.getMockData();
+      return allData.filter((item) => {
+        return (
+          item.vehicle_license_plate?.toLowerCase().includes(licensePlate.toLowerCase()) &&
+          (!status || item.status === status)
+        );
+      });
+    }
+  },
+
+  /**
    * Obtener estadísticas de pre-registros
    * @returns {Promise<Object>} Estadísticas
    */
@@ -863,6 +892,35 @@ export const preRegisterService = {
         rejected: 2,
         today: 3,
         this_week: 12,
+        with_vehicle: 6, // NUEVA ESTADÍSTICA
+      };
+    }
+  },
+
+  /**
+   * NUEVO: Obtener estadísticas específicas de vehículos
+   * @returns {Promise<Object>} Estadísticas de vehículos
+   */
+  async getVehicleStats() {
+    try {
+      console.log("🚗 Getting vehicle stats");
+      const response = await api.get("/pre-registrations/vehicle-stats");
+      console.log("✅ Vehicle stats loaded:", response.data);
+      return response.data;
+    } catch (error) {
+      console.warn("⚠️ Vehicle stats endpoint not available, using mock stats");
+      return {
+        total_with_vehicle: 6,
+        total_without_vehicle: 9,
+        percentage_with_vehicle: 40.0,
+        vehicles_today: 2,
+        vehicles_this_week: 5,
+        vehicles_this_month: 6,
+        top_vehicle_makes: [
+          { make: "Toyota", count: 3 },
+          { make: "Honda", count: 2 },
+          { make: "Nissan", count: 1 },
+        ],
       };
     }
   },
@@ -881,12 +939,15 @@ export const preRegisterService = {
         const transformedData = {
           visitor_id: preRegisterData.visitor_id,
           authorizer_id: preRegisterData.authorizer_id || 1,
-          visit_purpose: preRegisterData.purpose, // ✅ Correcto
+          visit_purpose: preRegisterData.purpose || preRegisterData.visit_purpose,
           visit_date: preRegisterData.visit_date,
           visit_time: this.formatTimeForBackend(preRegisterData.visit_time),
-          // CORREGIR: Convertir minutos a horas
           expected_duration_hours: this.convertDurationToHours(preRegisterData.estimated_duration),
           additional_notes: preRegisterData.additional_notes || null,
+          // NUEVOS CAMPOS DE VEHÍCULO
+          vehicle_make: preRegisterData.vehicle_make || null,
+          vehicle_model: preRegisterData.vehicle_model || null,
+          vehicle_license_plate: preRegisterData.vehicle_license_plate || null,
         };
 
         console.log("📄 Using simple endpoint with existing visitor_id:", transformedData);
@@ -906,9 +967,12 @@ export const preRegisterService = {
           visit_purpose: preRegisterData.purpose || preRegisterData.visit_purpose,
           visit_date: preRegisterData.visit_date,
           visit_time: this.formatTimeForBackend(preRegisterData.visit_time),
-          // CORREGIR: Convertir minutos a horas
           expected_duration_hours: this.convertDurationToHours(preRegisterData.estimated_duration),
           additional_notes: preRegisterData.additional_notes || null,
+          // NUEVOS CAMPOS DE VEHÍCULO
+          vehicle_make: preRegisterData.vehicle_make || null,
+          vehicle_model: preRegisterData.vehicle_model || null,
+          vehicle_license_plate: preRegisterData.vehicle_license_plate || null,
         };
 
         console.log("📄 Using with-visitor endpoint:", transformedData);
@@ -979,6 +1043,37 @@ export const preRegisterService = {
   },
 
   /**
+   * NUEVA: Validar formato de placa
+   * @param {string} licensePlate - Placa a validar
+   * @returns {boolean} True si es válida
+   */
+  validateLicensePlate(licensePlate) {
+    if (!licensePlate) return true; // Es opcional
+
+    // Quitar espacios y convertir a mayúsculas
+    const plate = licensePlate.trim().toUpperCase();
+
+    // Validar longitud (6-10 caracteres)
+    if (plate.length < 6 || plate.length > 10) {
+      return false;
+    }
+
+    // Validar que contenga solo letras, números y guiones
+    const plateRegex = /^[A-Z0-9\-]+$/;
+    return plateRegex.test(plate);
+  },
+
+  /**
+   * NUEVA: Formatear placa para mostrar
+   * @param {string} licensePlate - Placa a formatear
+   * @returns {string} Placa formateada
+   */
+  formatLicensePlate(licensePlate) {
+    if (!licensePlate) return "";
+    return licensePlate.trim().toUpperCase();
+  },
+
+  /**
    * Obtener pre-registro por ID
    * @param {number} id - ID del pre-registro
    * @returns {Promise<Object>} Pre-registro
@@ -1011,7 +1106,7 @@ export const preRegisterService = {
 
       return {
         id,
-        status: "approved",
+        status: "APPROVED",
         approved_at: new Date().toISOString(),
         approved_by: "admin@empresa.com",
         approval_notes: notes,
@@ -1036,7 +1131,7 @@ export const preRegisterService = {
 
       return {
         id,
-        status: "rejected",
+        status: "REJECTED",
         rejected_at: new Date().toISOString(),
         rejected_by: "admin@empresa.com",
         rejection_reason: reason,
@@ -1053,7 +1148,21 @@ export const preRegisterService = {
   async update(id, updateData) {
     try {
       console.log(`📝 Updating pre-register ${id}`, updateData);
-      const response = await api.put(`/pre-registrations/${id}`, updateData);
+
+      // Transformar datos para el backend incluyendo campos de vehículo
+      const transformedData = {
+        visit_purpose: updateData.purpose || updateData.visit_purpose,
+        visit_date: updateData.visit_date,
+        visit_time: this.formatTimeForBackend(updateData.visit_time),
+        expected_duration_hours: this.convertDurationToHours(updateData.estimated_duration),
+        additional_notes: updateData.additional_notes || null,
+        // NUEVOS CAMPOS DE VEHÍCULO
+        vehicle_make: updateData.vehicle_make || null,
+        vehicle_model: updateData.vehicle_model || null,
+        vehicle_license_plate: updateData.vehicle_license_plate || null,
+      };
+
+      const response = await api.put(`/pre-registrations/${id}`, transformedData);
       console.log("✅ Pre-register updated:", response.data);
       return response.data;
     } catch (error) {
@@ -1080,7 +1189,7 @@ export const preRegisterService = {
   },
 
   /**
-   * Datos mock para desarrollo
+   * Datos mock para desarrollo ACTUALIZADOS CON CAMPOS DE VEHÍCULO
    * @param {Object} filters - Filtros a aplicar
    * @returns {Array} Datos mock filtrados
    */
@@ -1095,60 +1204,95 @@ export const preRegisterService = {
       {
         id: 1,
         visitor_name: "Ana Rodríguez",
-        email: "ana.rodriguez@innovatech.com",
-        phone: "+52 555 1234567",
-        company: "Innovación Tech",
-        identification: "INE",
-        identification_number: "RODA850312MDFXXX01",
+        visitor_email: "ana.rodriguez@innovatech.com",
+        visitor_phone: "+52 555 1234567",
+        visitor_company: "Innovación Tech",
+        visitor_identification: "INE",
+        visitor_identification_number: "RODA850312MDFXXX01",
+        authorizer_name: "Jorge Mendez",
+        authorizer_email: "jorge.mendez@empresa.com",
         visit_date: tomorrow.toISOString().split("T")[0],
-        visit_time: "10:00",
-        purpose: "Demostración de producto",
-        host_name: "Jorge Mendez",
-        host_email: "jorge.mendez@empresa.com",
-        estimated_duration: 90,
-        status: "pending",
+        visit_time: "10:00:00",
+        visit_purpose: "Demostración de producto",
+        expected_duration_hours: 2,
+        status: "PENDING",
         additional_notes: "Requiere proyector y sala de juntas",
+        // NUEVOS CAMPOS DE VEHÍCULO
+        vehicle_make: "Toyota",
+        vehicle_model: "Corolla",
+        vehicle_license_plate: "ABC-123-XY",
         created_at: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
         requested_by: "sistema@empresa.com",
       },
       {
         id: 2,
         visitor_name: "Roberto Silva",
-        email: "roberto.silva@serviciospro.com",
-        phone: "+52 555 9876543",
-        company: "Servicios Pro",
-        identification: "RFC",
-        identification_number: "SILR901201XXX",
+        visitor_email: "roberto.silva@serviciospro.com",
+        visitor_phone: "+52 555 9876543",
+        visitor_company: "Servicios Pro",
+        visitor_identification: "RFC",
+        visitor_identification_number: "SILR901201XXX",
+        authorizer_name: "Sofia Castro",
+        authorizer_email: "sofia.castro@empresa.com",
         visit_date: tomorrow.toISOString().split("T")[0],
-        visit_time: "14:30",
-        purpose: "Reunión comercial",
-        host_name: "Sofia Castro",
-        host_email: "sofia.castro@empresa.com",
-        estimated_duration: 60,
-        status: "approved",
+        visit_time: "14:30:00",
+        visit_purpose: "Reunión comercial",
+        expected_duration_hours: 1,
+        status: "APPROVED",
         additional_notes: "",
+        // SIN VEHÍCULO
+        vehicle_make: null,
+        vehicle_model: null,
+        vehicle_license_plate: null,
         created_at: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
         requested_by: "recepcion@empresa.com",
       },
       {
         id: 3,
         visitor_name: "Carmen Vega",
-        email: "carmen.vega@consultores.com",
-        phone: "+52 555 5555555",
-        company: "Consultores ABC",
-        identification: "CURP",
-        identification_number: "VEGC800215MDFXXX02",
+        visitor_email: "carmen.vega@consultores.com",
+        visitor_phone: "+52 555 5555555",
+        visitor_company: "Consultores ABC",
+        visitor_identification: "CURP",
+        visitor_identification_number: "VEGC800215MDFXXX02",
+        authorizer_name: "Luis Hernández",
+        authorizer_email: "luis.hernandez@empresa.com",
         visit_date: dayAfter.toISOString().split("T")[0],
-        visit_time: "09:00",
-        purpose: "Auditoría",
-        host_name: "Luis Hernández",
-        host_email: "luis.hernandez@empresa.com",
-        estimated_duration: 240,
-        status: "rejected",
+        visit_time: "09:00:00",
+        visit_purpose: "Auditoría",
+        expected_duration_hours: 4,
+        status: "REJECTED",
         additional_notes: "Auditoría anual de sistemas",
+        // NUEVOS CAMPOS DE VEHÍCULO
+        vehicle_make: "Honda",
+        vehicle_model: "Civic",
+        vehicle_license_plate: "DEF-456-ZW",
         created_at: new Date(Date.now() - 1000 * 60 * 60 * 4).toISOString(),
         requested_by: "admin@empresa.com",
         rejection_reason: "Fecha no disponible, proponer alternativa",
+      },
+      {
+        id: 4,
+        visitor_name: "Miguel Torres",
+        visitor_email: "miguel.torres@logistica.com",
+        visitor_phone: "+52 555 7777777",
+        visitor_company: "Logística Express",
+        visitor_identification: "INE",
+        visitor_identification_number: "TORM750810HDFRR09",
+        authorizer_name: "Patricia Moreno",
+        authorizer_email: "patricia.moreno@empresa.com",
+        visit_date: today.toISOString().split("T")[0],
+        visit_time: "16:00:00",
+        visit_purpose: "Entrega de equipos",
+        expected_duration_hours: 1,
+        status: "APPROVED",
+        additional_notes: "Entrega en muelle de carga",
+        // NUEVOS CAMPOS DE VEHÍCULO
+        vehicle_make: "Ford",
+        vehicle_model: "Transit",
+        vehicle_license_plate: "GHI-789-UV",
+        created_at: new Date(Date.now() - 1000 * 60 * 60 * 6).toISOString(),
+        requested_by: "logistica@empresa.com",
       },
     ];
 
@@ -1167,10 +1311,20 @@ export const preRegisterService = {
       filteredData = filteredData.filter((item) => item.visit_date <= filters.visit_date_to);
     }
 
-    if (filters.host_name) {
+    if (filters.vehicle_license_plate) {
       filteredData = filteredData.filter((item) =>
-        item.host_name.toLowerCase().includes(filters.host_name.toLowerCase())
+        item.vehicle_license_plate
+          ?.toLowerCase()
+          .includes(filters.vehicle_license_plate.toLowerCase())
       );
+    }
+
+    if (filters.has_vehicle !== undefined) {
+      if (filters.has_vehicle) {
+        filteredData = filteredData.filter((item) => item.vehicle_license_plate);
+      } else {
+        filteredData = filteredData.filter((item) => !item.vehicle_license_plate);
+      }
     }
 
     if (filters.visitor_name) {
@@ -1181,7 +1335,9 @@ export const preRegisterService = {
 
     if (filters.company) {
       filteredData = filteredData.filter(
-        (item) => item.company && item.company.toLowerCase().includes(filters.company.toLowerCase())
+        (item) =>
+          item.visitor_company &&
+          item.visitor_company.toLowerCase().includes(filters.company.toLowerCase())
       );
     }
 

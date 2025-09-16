@@ -12,15 +12,15 @@
 
 import Icon from "@mui/material/Icon";
 import PeopleIcon from "@mui/icons-material/People";
-import CameraAltIcon from "@mui/icons-material/CameraAlt";
-import DirectionsCarIcon from "@mui/icons-material/DirectionsCar";
+// import CameraAltIcon from "@mui/icons-material/CameraAlt";
+// import DirectionsCarIcon from "@mui/icons-material/DirectionsCar";
 // import AssessmentIcon from "@mui/icons-material/Assessment";
 // import SecurityIcon from "@mui/icons-material/Security";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
 
 // Layouts
 import Dashboard from "layouts/dashboard";
-import Tables from "layouts/tables";
+// import Tables from "layouts/tables";
 // import Billing from "layouts/billing";
 // import Notifications from "layouts/notifications";
 import Profile from "layouts/profile";
@@ -61,39 +61,39 @@ const routes = [
     showInBreadcrumb: true, // Mostrar en breadcrumb
     isPublic: false, // Ruta pública (sin auth)
   },
-  {
-    type: "collapse",
-    name: "Reconocimiento Facial",
-    key: "face-recognition",
-    icon: <CameraAltIcon fontSize="small" />,
-    route: "/recognition/face",
-    component: <Tables />,
-    // 🔐 Solo para admin y operadores
-    visible: true,
-    requireAuth: true,
-    roles: ["admin", "operator"],
-    showInSidebar: true,
-    showInBreadcrumb: true,
-    isPublic: false,
-    // 🆕 Propiedades adicionales
-    badge: "IA", // Badge en el sidebar
-    description: "Reconocimiento facial en tiempo real",
-  },
-  {
-    type: "collapse",
-    name: "Reconocimiento de Placas",
-    key: "plate-recognition",
-    icon: <DirectionsCarIcon fontSize="small" />,
-    route: "/recognition/plates",
-    component: <Tables />,
-    visible: true,
-    requireAuth: true,
-    roles: ["admin", "operator"],
-    showInSidebar: true,
-    showInBreadcrumb: true,
-    isPublic: false,
-    badge: "ANPR",
-  },
+  // {
+  //   type: "collapse",
+  //   name: "Reconocimiento Facial",
+  //   key: "face-recognition",
+  //   icon: <CameraAltIcon fontSize="small" />,
+  //   route: "/recognition/face",
+  //   component: <Tables />,
+  //   // 🔐 Solo para admin y operadores
+  //   visible: true,
+  //   requireAuth: true,
+  //   roles: ["admin", "operator"],
+  //   showInSidebar: true,
+  //   showInBreadcrumb: true,
+  //   isPublic: false,
+  //   // 🆕 Propiedades adicionales
+  //   badge: "IA", // Badge en el sidebar
+  //   description: "Reconocimiento facial en tiempo real",
+  // },
+  // {
+  //   type: "collapse",
+  //   name: "Reconocimiento de Placas",
+  //   key: "plate-recognition",
+  //   icon: <DirectionsCarIcon fontSize="small" />,
+  //   route: "/recognition/plates",
+  //   component: <Tables />,
+  //   visible: true,
+  //   requireAuth: true,
+  //   roles: ["admin", "operator"],
+  //   showInSidebar: true,
+  //   showInBreadcrumb: true,
+  //   isPublic: false,
+  //   badge: "ANPR",
+  // },
   {
     type: "collapse",
     name: "Gestión de Visitantes",

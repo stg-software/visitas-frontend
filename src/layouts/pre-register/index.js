@@ -29,7 +29,9 @@ import {
   Divider,
   Paper,
   Box,
-  Radio,
+  FormControlLabel,
+  Switch,
+  Typography,
 } from "@mui/material";
 
 // Material Dashboard 2 React components
@@ -41,7 +43,6 @@ import MDButton from "components/MDButton";
 // Material Dashboard 2 React example components
 import DashboardLayout from "examples/LayoutContainers/DashboardLayout";
 import DashboardNavbar from "examples/Navbars/DashboardNavbar";
-import Footer from "examples/Footer";
 
 // Servicios de API
 import { preRegisterService, visitorService, userService } from "../../services/apiServices";
@@ -55,6 +56,9 @@ const PreRegisterForm = ({ preRegister, onSave, onCancel, isEdit = false }) => {
   const [loadingVisitors, setLoadingVisitors] = useState(false);
   const [loadingAuthorizers, setLoadingAuthorizers] = useState(false);
 
+  // ESTADO PARA CONTROLAR SI INCLUYE VEHÍCULO
+  const [includesVehicle, setIncludesVehicle] = useState(false);
+
   const [formData, setFormData] = useState({
     visitor_id: null,
     authorizer_id: null,
@@ -63,6 +67,10 @@ const PreRegisterForm = ({ preRegister, onSave, onCancel, isEdit = false }) => {
     visit_time: "",
     expected_duration_hours: 2,
     additional_notes: "",
+    // NUEVOS CAMPOS DE VEHÍCULO
+    vehicle_make: "",
+    vehicle_model: "",
+    vehicle_license_plate: "",
     ...preRegister,
   });
 
@@ -80,8 +88,13 @@ const PreRegisterForm = ({ preRegister, onSave, onCancel, isEdit = false }) => {
         visit_date: tomorrow.toISOString().split("T")[0],
         visit_time: "10:00",
       }));
+    } else {
+      // Si está editando y tiene datos de vehículo, activar el switch
+      if (preRegister?.vehicle_license_plate) {
+        setIncludesVehicle(true);
+      }
     }
-  }, [isEdit]);
+  }, [isEdit, preRegister]);
 
   const loadVisitors = async () => {
     setLoadingVisitors(true);
@@ -120,6 +133,29 @@ const PreRegisterForm = ({ preRegister, onSave, onCancel, isEdit = false }) => {
     }
   };
 
+  // NUEVO: Manejar el cambio del switch de vehículo
+  const handleVehicleToggle = (event) => {
+    const checked = event.target.checked;
+    setIncludesVehicle(checked);
+
+    // Si desactiva el vehículo, limpiar los campos relacionados
+    if (!checked) {
+      setFormData((prev) => ({
+        ...prev,
+        vehicle_make: "",
+        vehicle_model: "",
+        vehicle_license_plate: "",
+      }));
+
+      // Limpiar errores de vehículo
+      setErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors.vehicle_license_plate;
+        return newErrors;
+      });
+    }
+  };
+
   const handleVisitorSelect = (event, newValue) => {
     console.log("Visitante seleccionado:", newValue);
     setSelectedVisitor(newValue);
@@ -146,6 +182,25 @@ const PreRegisterForm = ({ preRegister, onSave, onCancel, isEdit = false }) => {
     }
   };
 
+  // NUEVA FUNCIÓN: Formatear placa mientras se escribe
+  const handleLicensePlateChange = (event) => {
+    let value = event.target.value;
+
+    // Convertir a mayúsculas y remover caracteres no válidos
+    value = value.toUpperCase().replace(/[^A-Z0-9\-]/g, "");
+
+    // Limitar longitud
+    if (value.length > 10) {
+      value = value.substring(0, 10);
+    }
+
+    setFormData((prev) => ({ ...prev, vehicle_license_plate: value }));
+
+    if (errors.vehicle_license_plate) {
+      setErrors((prev) => ({ ...prev, vehicle_license_plate: "" }));
+    }
+  };
+
   const validateForm = () => {
     const newErrors = {};
 
@@ -164,6 +219,16 @@ const PreRegisterForm = ({ preRegister, onSave, onCancel, isEdit = false }) => {
     }
     if (!formData.visit_time) {
       newErrors.visit_time = "La hora de visita es requerida";
+    }
+
+    // VALIDACIONES DE VEHÍCULO
+    if (includesVehicle) {
+      if (!formData.vehicle_license_plate.trim()) {
+        newErrors.vehicle_license_plate =
+          "La placa del vehículo es requerida cuando se incluye vehículo";
+      } else if (formData.vehicle_license_plate.length < 6) {
+        newErrors.vehicle_license_plate = "La placa debe tener al menos 6 caracteres";
+      }
     }
 
     setErrors(newErrors);
@@ -188,6 +253,12 @@ const PreRegisterForm = ({ preRegister, onSave, onCancel, isEdit = false }) => {
         purpose: formData.visit_purpose.trim(),
         estimated_duration: parseInt(formData.expected_duration_hours) * 60,
         additional_notes: formData.additional_notes.trim() || null,
+        // NUEVOS CAMPOS DE VEHÍCULO (solo si incluye vehículo)
+        vehicle_make: includesVehicle ? formData.vehicle_make.trim() || null : null,
+        vehicle_model: includesVehicle ? formData.vehicle_model.trim() || null : null,
+        vehicle_license_plate: includesVehicle
+          ? formData.vehicle_license_plate.trim() || null
+          : null,
       };
 
       console.log("Datos a enviar:", submitData);
@@ -437,6 +508,105 @@ const PreRegisterForm = ({ preRegister, onSave, onCancel, isEdit = false }) => {
                   placeholder="Información adicional..."
                 />
               </Grid>
+
+              {/* NUEVA SECCIÓN: Información del Vehículo */}
+              <Grid item xs={12}>
+                <Divider />
+                <MDBox
+                  display="flex"
+                  alignItems="center"
+                  justifyContent="space-between"
+                  sx={{ mt: 2 }}
+                >
+                  <MDBox>
+                    <MDTypography variant="h6" color="primary">
+                      Información del Vehículo
+                    </MDTypography>
+                    <MDTypography variant="body2" color="text" sx={{ mt: 1 }}>
+                      ¿El visitante llegará en vehículo?
+                    </MDTypography>
+                  </MDBox>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={includesVehicle}
+                        onChange={handleVehicleToggle}
+                        color="primary"
+                      />
+                    }
+                    label={includesVehicle ? "Sí, incluye vehículo" : "No incluye vehículo"}
+                  />
+                </MDBox>
+              </Grid>
+
+              {/* Campos de vehículo (solo si está activado) */}
+              {includesVehicle && (
+                <>
+                  <Grid item xs={12}>
+                    <Paper
+                      elevation={1}
+                      sx={{
+                        p: 2,
+                        backgroundColor: "#f0fff0",
+                        border: "1px solid #90ee90",
+                      }}
+                    >
+                      <MDBox display="flex" alignItems="center" sx={{ mb: 2 }}>
+                        <Icon sx={{ mr: 1, color: "success.main" }}>directions_car</Icon>
+                        <MDTypography variant="body2" fontWeight="medium" color="success.main">
+                          Información del vehículo del visitante
+                        </MDTypography>
+                      </MDBox>
+
+                      <Grid container spacing={2}>
+                        <Grid item xs={12} md={4}>
+                          <MDInput
+                            type="text"
+                            label="Marca del Vehículo"
+                            value={formData.vehicle_make}
+                            onChange={handleChange("vehicle_make")}
+                            fullWidth
+                            placeholder="Ej: Toyota, Honda, Nissan"
+                          />
+                        </Grid>
+                        <Grid item xs={12} md={4}>
+                          <MDInput
+                            type="text"
+                            label="Modelo del Vehículo"
+                            value={formData.vehicle_model}
+                            onChange={handleChange("vehicle_model")}
+                            fullWidth
+                            placeholder="Ej: Corolla, Civic, Sentra"
+                          />
+                        </Grid>
+                        <Grid item xs={12} md={4}>
+                          <MDInput
+                            type="text"
+                            label="Placa del Vehículo *"
+                            value={formData.vehicle_license_plate}
+                            onChange={handleLicensePlateChange}
+                            fullWidth
+                            required={includesVehicle}
+                            error={!!errors.vehicle_license_plate}
+                            helperText={errors.vehicle_license_plate || "Formato: ABC-123-XY"}
+                            placeholder="ABC-123-XY"
+                            inputProps={{
+                              maxLength: 10,
+                              style: { textTransform: "uppercase" },
+                            }}
+                          />
+                        </Grid>
+                      </Grid>
+
+                      <MDTypography variant="caption" color="text" sx={{ mt: 1, display: "block" }}>
+                        <Icon sx={{ fontSize: 14, mr: 0.5, verticalAlign: "middle" }}>info</Icon>
+                        La placa es requerida para el registro vehicular. Ingresa solo letras,
+                        números y guiones.
+                      </MDTypography>
+                    </Paper>
+                  </Grid>
+                </>
+              )}
             </Grid>
           </MDBox>
         </DialogContent>
@@ -484,6 +654,9 @@ function PreRegisterManagement() {
 
   // Estados para búsqueda y filtros
   const [searchTerm, setSearchTerm] = useState("");
+  // NUEVOS FILTROS PARA VEHÍCULOS
+  const [vehicleFilter, setVehicleFilter] = useState("all"); // "all", "with_vehicle", "without_vehicle"
+  const [licensePlateSearch, setLicensePlateSearch] = useState("");
 
   // Estados para el diálogo
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -507,7 +680,7 @@ function PreRegisterManagement() {
 
   useEffect(() => {
     handleSearch();
-  }, [searchTerm, preRegisters]);
+  }, [searchTerm, vehicleFilter, licensePlateSearch, preRegisters]);
 
   // Funciones de carga de datos
   const loadPreRegisters = async () => {
@@ -526,19 +699,41 @@ function PreRegisterManagement() {
     }
   };
 
-  // Función de búsqueda
+  // FUNCIÓN DE BÚSQUEDA ACTUALIZADA
   const handleSearch = () => {
-    if (!searchTerm.trim()) {
-      setFilteredPreRegisters(preRegisters);
-      return;
+    let filtered = [...preRegisters];
+
+    // Filtro por texto general
+    if (searchTerm.trim()) {
+      filtered = filtered.filter(
+        (preRegister) =>
+          preRegister.visitor_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          preRegister.purpose?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          preRegister.visit_purpose?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          preRegister.host_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          preRegister.authorizer_name?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
     }
 
-    const filtered = preRegisters.filter(
-      (preRegister) =>
-        preRegister.visitor_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        preRegister.purpose?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        preRegister.host_name?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    // Filtro por vehículo
+    if (vehicleFilter === "with_vehicle") {
+      filtered = filtered.filter(
+        (preRegister) =>
+          preRegister.vehicle_license_plate && preRegister.vehicle_license_plate.trim() !== ""
+      );
+    } else if (vehicleFilter === "without_vehicle") {
+      filtered = filtered.filter(
+        (preRegister) =>
+          !preRegister.vehicle_license_plate || preRegister.vehicle_license_plate.trim() === ""
+      );
+    }
+
+    // Filtro por placa específica
+    if (licensePlateSearch.trim()) {
+      filtered = filtered.filter((preRegister) =>
+        preRegister.vehicle_license_plate?.toLowerCase().includes(licensePlateSearch.toLowerCase())
+      );
+    }
 
     setFilteredPreRegisters(filtered);
     setPage(0);
@@ -734,20 +929,36 @@ function PreRegisterManagement() {
     }
   };
 
+  // NUEVA FUNCIÓN: Formatear información del vehículo
+  const formatVehicleInfo = (preRegister) => {
+    if (!preRegister.vehicle_license_plate) {
+      return "Sin vehículo";
+    }
+
+    const parts = [];
+    if (preRegister.vehicle_make) parts.push(preRegister.vehicle_make);
+    if (preRegister.vehicle_model) parts.push(preRegister.vehicle_model);
+
+    const vehicleDescription = parts.length > 0 ? parts.join(" ") : "Vehículo";
+    return `${vehicleDescription} - ${preRegister.vehicle_license_plate}`;
+  };
+
   // Datos paginados
   const paginatedPreRegisters = filteredPreRegisters.slice(
     page * rowsPerPage,
     page * rowsPerPage + rowsPerPage
   );
 
-  // Datos simulados para mostrar las estadísticas
+  // ESTADÍSTICAS ACTUALIZADAS CON VEHÍCULOS
   const stats = {
     pending: filteredPreRegisters.filter((pr) => pr.status === "pending").length,
     approved: filteredPreRegisters.filter((pr) => pr.status === "approved").length,
     today: filteredPreRegisters.filter(
       (pr) => pr.visit_date === new Date().toISOString().split("T")[0]
     ).length,
-    thisWeek: filteredPreRegisters.length,
+    withVehicle: filteredPreRegisters.filter(
+      (pr) => pr.vehicle_license_plate && pr.vehicle_license_plate.trim() !== ""
+    ).length,
   };
 
   return (
@@ -781,63 +992,83 @@ function PreRegisterManagement() {
               </MDBox>
             )}
 
-            {/* Stats Cards */}
+            {/* Stats Cards ACTUALIZADAS */}
             <Grid container spacing={3} sx={{ mb: 3 }}>
               <Grid item xs={12} sm={6} md={3}>
                 <Card>
                   <MDBox p={3}>
-                    <MDTypography variant="body2" color="text" gutterBottom>
-                      Pendientes
-                    </MDTypography>
-                    <MDTypography variant="h4" fontWeight="medium">
-                      {stats.pending}
-                    </MDTypography>
+                    <MDBox display="flex" alignItems="center" justifyContent="space-between">
+                      <MDBox>
+                        <MDTypography variant="body2" color="text" gutterBottom>
+                          Pendientes
+                        </MDTypography>
+                        <MDTypography variant="h4" fontWeight="medium">
+                          {stats.pending}
+                        </MDTypography>
+                      </MDBox>
+                      <Icon sx={{ fontSize: 32, color: "warning.main" }}>pending</Icon>
+                    </MDBox>
                   </MDBox>
                 </Card>
               </Grid>
               <Grid item xs={12} sm={6} md={3}>
                 <Card>
                   <MDBox p={3}>
-                    <MDTypography variant="body2" color="text" gutterBottom>
-                      Aprobados
-                    </MDTypography>
-                    <MDTypography variant="h4" fontWeight="medium">
-                      {stats.approved}
-                    </MDTypography>
+                    <MDBox display="flex" alignItems="center" justifyContent="space-between">
+                      <MDBox>
+                        <MDTypography variant="body2" color="text" gutterBottom>
+                          Aprobados
+                        </MDTypography>
+                        <MDTypography variant="h4" fontWeight="medium">
+                          {stats.approved}
+                        </MDTypography>
+                      </MDBox>
+                      <Icon sx={{ fontSize: 32, color: "success.main" }}>check_circle</Icon>
+                    </MDBox>
                   </MDBox>
                 </Card>
               </Grid>
               <Grid item xs={12} sm={6} md={3}>
                 <Card>
                   <MDBox p={3}>
-                    <MDTypography variant="body2" color="text" gutterBottom>
-                      Hoy
-                    </MDTypography>
-                    <MDTypography variant="h4" fontWeight="medium">
-                      {stats.today}
-                    </MDTypography>
+                    <MDBox display="flex" alignItems="center" justifyContent="space-between">
+                      <MDBox>
+                        <MDTypography variant="body2" color="text" gutterBottom>
+                          Hoy
+                        </MDTypography>
+                        <MDTypography variant="h4" fontWeight="medium">
+                          {stats.today}
+                        </MDTypography>
+                      </MDBox>
+                      <Icon sx={{ fontSize: 32, color: "info.main" }}>today</Icon>
+                    </MDBox>
                   </MDBox>
                 </Card>
               </Grid>
               <Grid item xs={12} sm={6} md={3}>
                 <Card>
                   <MDBox p={3}>
-                    <MDTypography variant="body2" color="text" gutterBottom>
-                      Total
-                    </MDTypography>
-                    <MDTypography variant="h4" fontWeight="medium">
-                      {filteredPreRegisters.length}
-                    </MDTypography>
+                    <MDBox display="flex" alignItems="center" justifyContent="space-between">
+                      <MDBox>
+                        <MDTypography variant="body2" color="text" gutterBottom>
+                          Con Vehículo
+                        </MDTypography>
+                        <MDTypography variant="h4" fontWeight="medium">
+                          {stats.withVehicle}
+                        </MDTypography>
+                      </MDBox>
+                      <Icon sx={{ fontSize: 32, color: "primary.main" }}>directions_car</Icon>
+                    </MDBox>
                   </MDBox>
                 </Card>
               </Grid>
             </Grid>
 
-            {/* Filtros y búsqueda */}
+            {/* Filtros y búsqueda ACTUALIZADOS */}
             <Card sx={{ mb: 3 }}>
               <MDBox p={3}>
                 <Grid container spacing={3} alignItems="center">
-                  <Grid item xs={12} md={6}>
+                  <Grid item xs={12} md={3}>
                     <MDInput
                       type="text"
                       label="Buscar pre-registros..."
@@ -850,7 +1081,44 @@ function PreRegisterManagement() {
                       placeholder="Visitante, propósito, anfitrión"
                     />
                   </Grid>
-                  <Grid item xs={12} md={6} display="flex" justifyContent="flex-end">
+                  <Grid item xs={12} md={2}>
+                    <TextField
+                      select
+                      label="Filtrar por vehículo"
+                      value={vehicleFilter}
+                      onChange={(e) => setVehicleFilter(e.target.value)}
+                      fullWidth
+                      variant="outlined"
+                    >
+                      <MenuItem value="all">Todos</MenuItem>
+                      <MenuItem value="with_vehicle">Con vehículo</MenuItem>
+                      <MenuItem value="without_vehicle">Sin vehículo</MenuItem>
+                    </TextField>
+                  </Grid>
+                  <Grid item xs={12} md={3}>
+                    <MDInput
+                      type="text"
+                      label="Buscar por placa"
+                      value={licensePlateSearch}
+                      onChange={(e) => setLicensePlateSearch(e.target.value)}
+                      fullWidth
+                      placeholder="ABC-123-XY"
+                      disabled={vehicleFilter === "without_vehicle"}
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={4} display="flex" justifyContent="flex-end" gap={1}>
+                    <MDButton
+                      variant="outlined"
+                      color="secondary"
+                      onClick={() => {
+                        setSearchTerm("");
+                        setVehicleFilter("all");
+                        setLicensePlateSearch("");
+                      }}
+                      startIcon={<Icon>clear</Icon>}
+                    >
+                      Limpiar
+                    </MDButton>
                     <MDButton
                       variant="gradient"
                       color="primary"
@@ -864,7 +1132,7 @@ function PreRegisterManagement() {
               </MDBox>
             </Card>
 
-            {/* Tabla de pre-registros */}
+            {/* Tabla de pre-registros ACTUALIZADA */}
             <Card>
               <MDBox p={3}>
                 <MDTypography variant="h6" fontWeight="medium" gutterBottom>
@@ -879,6 +1147,7 @@ function PreRegisterManagement() {
                         <TableCell>Anfitrión</TableCell>
                         <TableCell>Propósito</TableCell>
                         <TableCell>Fecha/Hora</TableCell>
+                        <TableCell>Vehículo</TableCell>
                         <TableCell>Estado</TableCell>
                         <TableCell>Registro</TableCell>
                         <TableCell align="center">Acciones</TableCell>
@@ -887,7 +1156,7 @@ function PreRegisterManagement() {
                     <TableBody>
                       {loading ? (
                         <TableRow>
-                          <TableCell colSpan={7} align="center">
+                          <TableCell colSpan={8} align="center">
                             <MDTypography variant="body2" color="text">
                               Cargando pre-registros...
                             </MDTypography>
@@ -895,9 +1164,9 @@ function PreRegisterManagement() {
                         </TableRow>
                       ) : paginatedPreRegisters.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={7} align="center">
+                          <TableCell colSpan={8} align="center">
                             <MDTypography variant="body2" color="text">
-                              {searchTerm
+                              {searchTerm || vehicleFilter !== "all" || licensePlateSearch
                                 ? "No se encontraron pre-registros con ese criterio"
                                 : "No hay pre-registros"}
                             </MDTypography>
@@ -937,6 +1206,33 @@ function PreRegisterManagement() {
                                   ? formatDateTime(preRegister.visit_date, preRegister.visit_time)
                                   : "-"}
                               </MDTypography>
+                            </TableCell>
+                            <TableCell>
+                              <MDBox display="flex" alignItems="center">
+                                {preRegister.vehicle_license_plate ? (
+                                  <>
+                                    <Icon sx={{ mr: 1, color: "primary.main", fontSize: 16 }}>
+                                      directions_car
+                                    </Icon>
+                                    <MDBox>
+                                      <MDTypography variant="body2" fontWeight="medium">
+                                        {preRegister.vehicle_license_plate}
+                                      </MDTypography>
+                                      {(preRegister.vehicle_make || preRegister.vehicle_model) && (
+                                        <MDTypography variant="caption" color="text">
+                                          {[preRegister.vehicle_make, preRegister.vehicle_model]
+                                            .filter(Boolean)
+                                            .join(" ")}
+                                        </MDTypography>
+                                      )}
+                                    </MDBox>
+                                  </>
+                                ) : (
+                                  <MDTypography variant="body2" color="text">
+                                    Sin vehículo
+                                  </MDTypography>
+                                )}
+                              </MDBox>
                             </TableCell>
                             <TableCell>
                               <Chip
@@ -1077,8 +1373,6 @@ function PreRegisterManagement() {
           </>
         )}
       </Menu>
-
-      <Footer />
     </DashboardLayout>
   );
 }
