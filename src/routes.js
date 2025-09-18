@@ -29,6 +29,7 @@ import SignUp from "layouts/authentication/sign-up";
 import PreRegisterPage from "layouts/pre-register";
 import VisitorManagement from "layouts/visitor-management";
 import Approvals from "layouts/approvals";
+import VisitCheckIn from "layouts/VisitCheckIn";
 
 const routes = [
   {
@@ -122,6 +123,20 @@ const routes = [
     showInBreadcrumb: true,
     isPublic: false,
   },
+  {
+    type: "collapse",
+    name: "Check-In de Visitas",
+    key: "visit-check-in",
+    icon: <Icon fontSize="small">play_circle_outline</Icon>,
+    route: "/visit-check-in",
+    component: <VisitCheckIn />,
+    visible: true,
+    requireAuth: true,
+    roles: ["admin", "operator", "user"],
+    showInSidebar: true,
+    showInBreadcrumb: true,
+    isPublic: false,
+  },
   // {
   //   type: "collapse",
   //   name: "Reportes y Analytics",
@@ -172,20 +187,20 @@ const routes = [
   //     return process.env.REACT_APP_ENV === "development";
   //   },
   // },
-  {
-    type: "collapse",
-    name: "Perfil de Usuario",
-    key: "profile",
-    icon: <Icon fontSize="small">person</Icon>,
-    route: "/profile",
-    component: <Profile />,
-    visible: true,
-    requireAuth: true,
-    roles: ["admin", "operator", "user"],
-    showInSidebar: true,
-    showInBreadcrumb: true,
-    isPublic: false,
-  },
+  // {
+  //   type: "collapse",
+  //   name: "Perfil de Usuario",
+  //   key: "profile",
+  //   icon: <Icon fontSize="small">person</Icon>,
+  //   route: "/profile",
+  //   component: <Profile />,
+  //   visible: true,
+  //   requireAuth: true,
+  //   roles: ["admin", "operator", "user"],
+  //   showInSidebar: true,
+  //   showInBreadcrumb: true,
+  //   isPublic: false,
+  // },
   // 🔓 Rutas públicas (autenticación)
   {
     type: null, // No aparece en sidebar

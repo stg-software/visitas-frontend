@@ -47,6 +47,9 @@ import DashboardNavbar from "examples/Navbars/DashboardNavbar";
 // Servicios de API
 import { preRegisterService, visitorService, userService } from "../../services/apiServices";
 
+//DataGrid
+import { DataGrid } from "@mui/x-data-grid";
+
 // Componente del Formulario Principal
 const PreRegisterForm = ({ preRegister, onSave, onCancel, isEdit = false }) => {
   const [selectedVisitor, setSelectedVisitor] = useState(null);
@@ -831,6 +834,8 @@ function PreRegisterManagement() {
     closeActionMenu();
   };
 
+  const handleStart = async (preRegisterId) => {};
+
   // Funciones de UI
   const showAlert = (message, severity = "success") => {
     setAlert({ show: true, message, severity });
@@ -960,6 +965,117 @@ function PreRegisterManagement() {
       (pr) => pr.vehicle_license_plate && pr.vehicle_license_plate.trim() !== ""
     ).length,
   };
+
+  // Columnas del DataGrid
+  const columns = [
+    {
+      field: "visitor",
+      headerName: "Visitante",
+      minWidth: 200,
+      flex: 1,
+      renderCell: (params) => (
+        <MDBox>
+          <MDTypography variant="body2" fontWeight="medium">
+            {params.row.visitor_name || "-"}
+          </MDTypography>
+          <MDTypography variant="caption" color="text">
+            {params.row.visitor_email || "-"}
+          </MDTypography>
+        </MDBox>
+      ),
+    },
+    {
+      field: "authorizer",
+      headerName: "Autorizador",
+      minWidth: 200,
+      flex: 1,
+      renderCell: (params) => (
+        <MDBox>
+          <MDTypography variant="body2" fontWeight="medium">
+            {params.row.authorizer_name || "-"}
+          </MDTypography>
+          <MDTypography variant="caption" color="text">
+            {params.row.authorizer_email || "-"}
+          </MDTypography>
+        </MDBox>
+      ),
+    },
+    {
+      field: "purpose",
+      headerName: "Propósito",
+      minWidth: 150,
+      flex: 1,
+      valueGetter: (params) => params.row.visit_purpose || params.row.purpose || "-",
+    },
+    {
+      field: "datetime",
+      headerName: "Fecha/Hora",
+      minWidth: 160,
+      flex: 1,
+      valueGetter: (params) =>
+        params.row.visit_date && params.row.visit_time
+          ? formatDateTime(params.row.visit_date, params.row.visit_time)
+          : "-",
+    },
+    {
+      field: "vehicle",
+      headerName: "Vehículo",
+      minWidth: 160,
+      flex: 1,
+      valueGetter: (params) => formatVehicleInfo(params.row),
+      renderCell: (params) =>
+        params.row.vehicle_license_plate ? (
+          <MDBox display="flex" alignItems="center">
+            <Icon sx={{ mr: 1, color: "primary.main", fontSize: 16 }}>directions_car</Icon>
+            <MDBox>
+              <MDTypography variant="body2" fontWeight="medium">
+                {params.row.vehicle_license_plate}
+              </MDTypography>
+              {(params.row.vehicle_make || params.row.vehicle_model) && (
+                <MDTypography variant="caption" color="text">
+                  {[params.row.vehicle_make, params.row.vehicle_model].filter(Boolean).join(" ")}
+                </MDTypography>
+              )}
+            </MDBox>
+          </MDBox>
+        ) : (
+          <MDTypography variant="body2" color="text">
+            Sin vehículo
+          </MDTypography>
+        ),
+    },
+    {
+      field: "status",
+      headerName: "Estado",
+      minWidth: 120,
+      renderCell: (params) => (
+        <Chip
+          label={getStatusLabel(params.row.status || "pending")}
+          color={getStatusColor(params.row.status || "pending")}
+          size="small"
+        />
+      ),
+    },
+    {
+      field: "created_at",
+      headerName: "Registro",
+      minWidth: 140,
+      valueGetter: (params) => formatDate(params.row.created_at || new Date()),
+    },
+    {
+      field: "actions",
+      headerName: "Acciones",
+      sortable: false,
+      minWidth: 100,
+      renderCell: (params) => (
+        <Tooltip title="Más opciones">
+          <IconButton size="small" onClick={(e) => openActionMenu(e, params.row)}>
+            <Icon>more_vert</Icon>
+          </IconButton>
+        </Tooltip>
+      ),
+    },
+  ];
 
   return (
     <DashboardLayout>
@@ -1132,153 +1248,39 @@ function PreRegisterManagement() {
               </MDBox>
             </Card>
 
-            {/* Tabla de pre-registros ACTUALIZADA */}
+            {/* DataGrid en lugar de Table */}
             <Card>
               <MDBox p={3}>
                 <MDTypography variant="h6" fontWeight="medium" gutterBottom>
                   Lista de Pre-registros ({filteredPreRegisters.length})
                 </MDTypography>
 
-                <TableContainer>
-                  <Table>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Visitante</TableCell>
-                        <TableCell>Anfitrión</TableCell>
-                        <TableCell>Propósito</TableCell>
-                        <TableCell>Fecha/Hora</TableCell>
-                        <TableCell>Vehículo</TableCell>
-                        <TableCell>Estado</TableCell>
-                        <TableCell>Registro</TableCell>
-                        <TableCell align="center">Acciones</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {loading ? (
-                        <TableRow>
-                          <TableCell colSpan={8} align="center">
-                            <MDTypography variant="body2" color="text">
-                              Cargando pre-registros...
-                            </MDTypography>
-                          </TableCell>
-                        </TableRow>
-                      ) : paginatedPreRegisters.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={8} align="center">
-                            <MDTypography variant="body2" color="text">
-                              {searchTerm || vehicleFilter !== "all" || licensePlateSearch
-                                ? "No se encontraron pre-registros con ese criterio"
-                                : "No hay pre-registros"}
-                            </MDTypography>
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        paginatedPreRegisters.map((preRegister) => (
-                          <TableRow key={preRegister.id} hover>
-                            <TableCell>
-                              <MDBox>
-                                <MDTypography variant="body2" fontWeight="medium">
-                                  {preRegister.visitor_name || "-"}
-                                </MDTypography>
-                                <MDTypography variant="caption" color="text">
-                                  {preRegister.visitor_email || "-"}
-                                </MDTypography>
-                              </MDBox>
-                            </TableCell>
-                            <TableCell>
-                              <MDBox>
-                                <MDTypography variant="body2" fontWeight="medium">
-                                  {preRegister.authorizer_name || "-"}
-                                </MDTypography>
-                                <MDTypography variant="caption" color="text">
-                                  {preRegister.authorizer_email || "-"}
-                                </MDTypography>
-                              </MDBox>
-                            </TableCell>
-                            <TableCell>
-                              <MDTypography variant="body2">
-                                {preRegister.visit_purpose || preRegister.purpose || "-"}
-                              </MDTypography>
-                            </TableCell>
-                            <TableCell>
-                              <MDTypography variant="body2">
-                                {preRegister.visit_date && preRegister.visit_time
-                                  ? formatDateTime(preRegister.visit_date, preRegister.visit_time)
-                                  : "-"}
-                              </MDTypography>
-                            </TableCell>
-                            <TableCell>
-                              <MDBox display="flex" alignItems="center">
-                                {preRegister.vehicle_license_plate ? (
-                                  <>
-                                    <Icon sx={{ mr: 1, color: "primary.main", fontSize: 16 }}>
-                                      directions_car
-                                    </Icon>
-                                    <MDBox>
-                                      <MDTypography variant="body2" fontWeight="medium">
-                                        {preRegister.vehicle_license_plate}
-                                      </MDTypography>
-                                      {(preRegister.vehicle_make || preRegister.vehicle_model) && (
-                                        <MDTypography variant="caption" color="text">
-                                          {[preRegister.vehicle_make, preRegister.vehicle_model]
-                                            .filter(Boolean)
-                                            .join(" ")}
-                                        </MDTypography>
-                                      )}
-                                    </MDBox>
-                                  </>
-                                ) : (
-                                  <MDTypography variant="body2" color="text">
-                                    Sin vehículo
-                                  </MDTypography>
-                                )}
-                              </MDBox>
-                            </TableCell>
-                            <TableCell>
-                              <Chip
-                                label={getStatusLabel(preRegister.status || "pending")}
-                                color={getStatusColor(preRegister.status || "pending")}
-                                size="small"
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <MDTypography variant="caption" color="text">
-                                {formatDate(preRegister.created_at || new Date())}
-                              </MDTypography>
-                            </TableCell>
-                            <TableCell align="center">
-                              <Tooltip title="Más opciones">
-                                <IconButton
-                                  size="small"
-                                  onClick={(e) => openActionMenu(e, preRegister)}
-                                >
-                                  <Icon>more_vert</Icon>
-                                </IconButton>
-                              </Tooltip>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-
-                {/* Paginación */}
-                <TablePagination
-                  component="div"
-                  count={filteredPreRegisters.length}
-                  page={page}
-                  onPageChange={handleChangePage}
-                  rowsPerPage={rowsPerPage}
-                  onRowsPerPageChange={handleChangeRowsPerPage}
-                  rowsPerPageOptions={[5, 10, 25, 50]}
-                  labelRowsPerPage="Filas por página:"
-                  labelDisplayedRows={(paginationInfo) => {
-                    const { from, to, count } = paginationInfo;
-                    const total = count !== -1 ? count : `más de ${to}`;
-                    return `${from}–${to} de ${total}`;
-                  }}
-                />
+                <div style={{ width: "100%" }}>
+                  <DataGrid
+                    autoHeight
+                    rows={filteredPreRegisters}
+                    columns={columns}
+                    getRowId={(row) => row.id}
+                    pageSize={rowsPerPage}
+                    onPageSizeChange={(newPageSize) => setRowsPerPage(newPageSize)}
+                    pagination
+                    paginationModel={{ page, pageSize: rowsPerPage }}
+                    onPaginationModelChange={(model) => {
+                      setPage(model.page);
+                      setRowsPerPage(model.pageSize);
+                    }}
+                    disableRowSelectionOnClick
+                    sx={{
+                      "& .MuiDataGrid-columnHeaders": {
+                        backgroundColor: "#f5f5f5",
+                        fontWeight: "bold",
+                      },
+                      "& .MuiDataGrid-cell": {
+                        whiteSpace: "nowrap",
+                      },
+                    }}
+                  />
+                </div>
               </MDBox>
             </Card>
           </Grid>

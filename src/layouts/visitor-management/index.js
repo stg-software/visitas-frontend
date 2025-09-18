@@ -47,6 +47,8 @@ import DashboardNavbar from "examples/Navbars/DashboardNavbar";
 import { visitorService } from "services/apiServices";
 import PhotoCapture from "components/PhotoCapture";
 
+import { DataGrid } from "@mui/x-data-grid";
+
 // Función auxiliar para convertir File a Base64
 const fileToBase64 = (file) => {
   return new Promise((resolve, reject) => {
@@ -594,6 +596,82 @@ function VisitorManagement() {
     page * rowsPerPage + rowsPerPage
   );
 
+  // === Definir columnas para DataGrid ===
+  const columns = [
+    {
+      field: "visitor",
+      headerName: "Visitante",
+      flex: 1.2,
+      renderCell: (params) => (
+        <MDBox display="flex" alignItems="center">
+          {params.row.face_encoding && (
+            <Avatar sx={{ mr: 2, width: 40, height: 40 }} src={params.row.photo_url}>
+              {params.row.full_name?.charAt(0)}
+            </Avatar>
+          )}
+          <MDBox>
+            <MDTypography variant="body2" fontWeight="medium">
+              {params.row.full_name}
+            </MDTypography>
+            <MDTypography variant="caption" color="text">
+              {params.row.phone || "-"}
+            </MDTypography>
+          </MDBox>
+        </MDBox>
+      ),
+    },
+    { field: "email", headerName: "Email", flex: 1 },
+    { field: "company", headerName: "Empresa", flex: 1 },
+    {
+      field: "identification",
+      headerName: "Identificación",
+      flex: 1,
+      renderCell: (params) => (
+        <MDBox>
+          <MDTypography variant="body2" fontWeight="medium">
+            {params.row.identification}
+          </MDTypography>
+          <MDTypography variant="caption" color="text">
+            {params.row.no_identification}
+          </MDTypography>
+        </MDBox>
+      ),
+    },
+    {
+      field: "is_active",
+      headerName: "Estado",
+      flex: 0.6,
+      renderCell: (params) => (
+        <Chip
+          label={getStatusLabel(params.value)}
+          color={getStatusColor(params.value)}
+          size="small"
+        />
+      ),
+    },
+    {
+      field: "created_at",
+      headerName: "Registro",
+      flex: 1,
+      valueGetter: (params) => formatDate(params.row.created_at),
+    },
+    {
+      field: "actions",
+      headerName: "Acciones",
+      flex: 0.5,
+      sortable: false,
+      renderCell: (params) => (
+        <Tooltip title="Más opciones">
+          <IconButton size="small" onClick={(e) => openActionMenu(e, params.row)}>
+            <Icon>more_vert</Icon>
+          </IconButton>
+        </Tooltip>
+      ),
+    },
+  ];
+
+  const rows = filteredVisitors.map((v) => ({ id: v.id, ...v }));
+
   return (
     <DashboardLayout>
       <DashboardNavbar />
@@ -656,126 +734,26 @@ function VisitorManagement() {
               </MDBox>
             </Card>
 
-            {/* Tabla de visitantes */}
+            {/* DataGrid de visitantes */}
             <Card>
               <MDBox p={3}>
                 <MDTypography variant="h6" fontWeight="medium" gutterBottom>
                   Lista de Visitantes ({filteredVisitors.length})
                 </MDTypography>
 
-                <TableContainer>
-                  <Table>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Visitante</TableCell>
-                        <TableCell>Email</TableCell>
-                        <TableCell>Empresa</TableCell>
-                        <TableCell>Identificación</TableCell>
-                        <TableCell>Estado</TableCell>
-                        <TableCell>Registro</TableCell>
-                        <TableCell align="center">Acciones</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {loading ? (
-                        <TableRow>
-                          <TableCell colSpan={7} align="center">
-                            <MDTypography variant="body2" color="text">
-                              Cargando visitantes...
-                            </MDTypography>
-                          </TableCell>
-                        </TableRow>
-                      ) : paginatedVisitors.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={7} align="center">
-                            <MDTypography variant="body2" color="text">
-                              {searchTerm
-                                ? "No se encontraron visitantes con ese criterio"
-                                : "No hay visitantes registrados"}
-                            </MDTypography>
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        paginatedVisitors.map((visitor) => (
-                          <TableRow key={visitor.id} hover>
-                            <TableCell>
-                              <MDBox display="flex" alignItems="center">
-                                {visitor.face_encoding && (
-                                  <Avatar
-                                    sx={{ mr: 2, width: 40, height: 40 }}
-                                    src={visitor.photo_url}
-                                  >
-                                    {visitor.full_name.charAt(0)}
-                                  </Avatar>
-                                )}
-                                <MDBox>
-                                  <MDTypography variant="body2" fontWeight="medium">
-                                    {visitor.full_name}
-                                  </MDTypography>
-                                  <MDTypography variant="caption" color="text">
-                                    {visitor.phone || "-"}
-                                  </MDTypography>
-                                </MDBox>
-                              </MDBox>
-                            </TableCell>
-                            <TableCell>
-                              <MDTypography variant="body2">{visitor.email}</MDTypography>
-                            </TableCell>
-                            <TableCell>
-                              <MDTypography variant="body2">{visitor.company || "-"}</MDTypography>
-                            </TableCell>
-                            <TableCell>
-                              <MDBox>
-                                <MDTypography variant="body2" fontWeight="medium">
-                                  {visitor.identification}
-                                </MDTypography>
-                                <MDTypography variant="caption" color="text">
-                                  {visitor.no_identification}
-                                </MDTypography>
-                              </MDBox>
-                            </TableCell>
-                            <TableCell>
-                              <Chip
-                                label={getStatusLabel(visitor.is_active)}
-                                color={getStatusColor(visitor.is_active)}
-                                size="small"
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <MDTypography variant="caption" color="text">
-                                {formatDate(visitor.created_at)}
-                              </MDTypography>
-                            </TableCell>
-                            <TableCell align="center">
-                              <Tooltip title="Más opciones">
-                                <IconButton
-                                  size="small"
-                                  onClick={(e) => openActionMenu(e, visitor)}
-                                >
-                                  <Icon>more_vert</Icon>
-                                </IconButton>
-                              </Tooltip>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-
-                {/* Paginación */}
-                <TablePagination
-                  component="div"
-                  count={filteredVisitors.length}
-                  page={page}
-                  onPageChange={handleChangePage}
-                  rowsPerPage={rowsPerPage}
-                  onRowsPerPageChange={handleChangeRowsPerPage}
+                <DataGrid
+                  rows={rows}
+                  columns={columns}
+                  autoHeight
+                  pageSize={10}
                   rowsPerPageOptions={[5, 10, 25, 50]}
-                  labelRowsPerPage="Filas por página:"
-                  labelDisplayedRows={({ from, to, count }) =>
-                    `${from}–${to} de ${count !== -1 ? count : `más de ${to}`}`
-                  }
+                  disableSelectionOnClick
+                  loading={loading}
+                  localeText={{
+                    noRowsLabel: searchTerm
+                      ? "No se encontraron visitantes con ese criterio"
+                      : "No hay visitantes registrados",
+                  }}
                 />
               </MDBox>
             </Card>
