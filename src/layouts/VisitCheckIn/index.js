@@ -1,6 +1,5 @@
-// src/layouts/check-in/index.js
-import React, { useState, useRef, useCallback } from "react";
-import Webcam from "react-webcam";
+// src/layouts/VisitCheckIn/index.js
+import React, { useState } from "react";
 import {
   Grid,
   Card,
@@ -35,6 +34,7 @@ import DashboardNavbar from "examples/Navbars/DashboardNavbar";
 
 // Services
 import api from "../../services/axiosConfig";
+import PhotoCapture from "components/PhotoCapture";
 
 function VisitCheckIn() {
   // Estados principales
@@ -45,15 +45,7 @@ function VisitCheckIn() {
   const [showDialog, setShowDialog] = useState(false);
   const [matches, setMatches] = useState([]);
   const [processingImage, setProcessingImage] = useState(null);
-
-  const webcamRef = useRef(null);
-
-  // Configuración de la webcam
-  const videoConstraints = {
-    width: 1280,
-    height: 720,
-    facingMode: "user",
-  };
+  const [photoFile, setPhotoFile] = useState(null);
 
   // Cambiar modo
   const handleModeChange = (event, newMode) => {
@@ -62,15 +54,11 @@ function VisitCheckIn() {
       setResult(null);
       setError(null);
       setProcessingImage(null);
+      setPhotoFile(null);
     }
   };
 
-  // Capturar imagen
-  const capture = useCallback(() => {
-    return webcamRef.current?.getScreenshot();
-  }, [webcamRef]);
-
-  // Convertir base64 a Blob
+  // Convertir base64 a Blob (igual que original)
   const base64ToBlob = (base64) => {
     const parts = base64.split(";base64,");
     const contentType = parts[0].split(":")[1];
@@ -85,7 +73,7 @@ function VisitCheckIn() {
     return new Blob([uInt8Array], { type: contentType });
   };
 
-  // Procesar reconocimiento facial
+  // Procesar reconocimiento facial (igual que original)
   const processFaceRecognition = async (imageBase64) => {
     try {
       setLoading(true);
@@ -99,9 +87,7 @@ function VisitCheckIn() {
       console.log("🔍 Procesando reconocimiento facial...");
 
       const response = await api.post("/images/process-face", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
+        headers: { "Content-Type": "multipart/form-data" },
       });
 
       console.log("✅ Respuesta:", response.data);
@@ -133,7 +119,7 @@ function VisitCheckIn() {
     }
   };
 
-  // Procesar reconocimiento de placa
+  // Procesar reconocimiento de placa (igual que original)
   const processPlateRecognition = async (imageBase64) => {
     try {
       setLoading(true);
@@ -147,9 +133,7 @@ function VisitCheckIn() {
       console.log("🚗 Procesando placa...");
 
       const response = await api.post("/images/process-plate", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
+        headers: { "Content-Type": "multipart/form-data" },
       });
 
       console.log("✅ Respuesta:", response.data);
@@ -170,7 +154,7 @@ function VisitCheckIn() {
     }
   };
 
-  // Buscar pre-registro por placa
+  // Buscar pre-registro por placa (igual que original)
   const searchPreRegistrationByPlate = async (licensePlate, confidence) => {
     try {
       console.log(`🔍 Buscando pre-registros para: ${licensePlate}`);
@@ -178,7 +162,7 @@ function VisitCheckIn() {
       const response = await api.get("/pre-registrations/", {
         params: {
           vehicle_license_plate: licensePlate,
-          status: "approved", // Usar minúsculas según el enum del backend
+          status: "approved",
         },
       });
 
@@ -205,13 +189,13 @@ function VisitCheckIn() {
     }
   };
 
-  // Verificar pre-registro
+  // Verificar pre-registro (igual que original)
   const checkPreRegistration = async (visitorId) => {
     try {
       const response = await api.get("/pre-registrations/", {
         params: {
           visitor_id: visitorId,
-          status: "approved", // Usar minúsculas según el enum del backend
+          status: "approved",
         },
       });
 
@@ -224,14 +208,14 @@ function VisitCheckIn() {
     }
   };
 
-  // Iniciar visita
+  // Iniciar visita (igual que original)
   const startVisit = async (preRegistrationId = null) => {
     try {
       setLoading(true);
 
       const visitData = {
-        visitor_id: result.visitor?.id || 1,
-        visit_type: mode === "face" ? "PERSON_ONLY" : "VEHICLE_ONLY",
+        visitor_id: result?.visitor?.id || 1,
+        visit_type: mode === "face" ? "person_only" : "vehicle_only",
         pre_registration_id: preRegistrationId,
         notes:
           mode === "face"
@@ -262,14 +246,30 @@ function VisitCheckIn() {
     }
   };
 
-  // Procesar captura
+  // === Integración mínima con PhotoCapture ===
+  const handlePhotoCapture = (file) => {
+    setPhotoFile(file);
+    const reader = new FileReader();
+    reader.onload = () => {
+      // guardamos como Data URL para que base64ToBlob funcione igual que antes
+      setProcessingImage(reader.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleClearPhoto = () => {
+    setPhotoFile(null);
+    setProcessingImage(null);
+  };
+
+  // Mantener el mismo botón y función de "Capturar Imagen"
+  // Ahora usa la imagen proveniente de PhotoCapture (processingImage)
   const handleCapture = () => {
-    const imageSrc = capture();
+    const imageSrc = processingImage;
     if (!imageSrc) {
       setError("No se pudo capturar imagen");
       return;
     }
-
     if (mode === "face") {
       processFaceRecognition(imageSrc);
     } else {
@@ -277,7 +277,7 @@ function VisitCheckIn() {
     }
   };
 
-  // Formatear fecha
+  // Formatear fecha (igual que original)
   const formatDateTime = (dateString, timeString) => {
     const date = new Date(`${dateString}T${timeString}`);
     return date.toLocaleDateString("es-MX", {
@@ -343,22 +343,16 @@ function VisitCheckIn() {
                       Vista de Cámara
                     </MDTypography>
 
-                    {/* Cámara */}
+                    {/* Sustituimos Webcam por PhotoCapture (mínimo cambio) */}
                     <Paper elevation={3} sx={{ p: 1, borderRadius: 2, mb: 2 }}>
-                      <Webcam
-                        audio={false}
-                        ref={webcamRef}
-                        screenshotFormat="image/jpeg"
-                        videoConstraints={videoConstraints}
-                        style={{
-                          width: "100%",
-                          maxWidth: "100%",
-                          borderRadius: "8px",
-                        }}
+                      <PhotoCapture
+                        onPhotoCapture={handlePhotoCapture}
+                        currentPhoto={photoFile}
+                        onClearPhoto={handleClearPhoto}
                       />
                     </Paper>
 
-                    {/* Instrucciones */}
+                    {/* Instrucciones (igual) */}
                     <Alert severity="info" sx={{ mb: 2 }}>
                       <MDBox>
                         <MDTypography variant="body2" fontWeight="medium" gutterBottom>
@@ -374,7 +368,7 @@ function VisitCheckIn() {
                       </MDBox>
                     </Alert>
 
-                    {/* Botón de captura */}
+                    {/* Botón de captura (misma UI / mismo handler) */}
                     <MDBox display="flex" justifyContent="center">
                       <MDButton
                         variant="gradient"
@@ -390,14 +384,14 @@ function VisitCheckIn() {
                           )
                         }
                       >
-                        {loading ? "Procesando..." : "Capturar Imagen"}
+                        {loading ? "Procesando..." : "Procesar Imagen"}
                       </MDButton>
                     </MDBox>
                   </MDBox>
                 </Card>
               </Grid>
 
-              {/* Panel de Resultados */}
+              {/* Panel de Resultados (sin cambios) */}
               <Grid item xs={12} lg={4}>
                 <Card>
                   <MDBox p={3}>
@@ -405,7 +399,7 @@ function VisitCheckIn() {
                       Resultado del Procesamiento
                     </MDTypography>
 
-                    {/* Imagen capturada */}
+                    {/* Imagen capturada (igual) */}
                     {processingImage && (
                       <Paper elevation={1} sx={{ p: 1, mb: 2, borderRadius: 2 }}>
                         <img
@@ -423,7 +417,7 @@ function VisitCheckIn() {
                       </Paper>
                     )}
 
-                    {/* Resultado */}
+                    {/* Resultado (igual) */}
                     {result && (
                       <Alert severity={result.type} sx={{ mb: 2 }}>
                         <MDBox>
@@ -464,14 +458,14 @@ function VisitCheckIn() {
                       </Alert>
                     )}
 
-                    {/* Error */}
+                    {/* Error (igual) */}
                     {error && (
                       <Alert severity="error" sx={{ mb: 2 }}>
                         {error}
                       </Alert>
                     )}
 
-                    {/* Botón de acción */}
+                    {/* Botón de acción (igual) */}
                     {result && result.type === "success" && result.visitor && !showDialog && (
                       <MDButton
                         variant="gradient"
@@ -484,7 +478,7 @@ function VisitCheckIn() {
                       </MDButton>
                     )}
 
-                    {/* Estado de carga */}
+                    {/* Estados (igual) */}
                     {loading && !result && (
                       <MDBox display="flex" flexDirection="column" alignItems="center" py={3}>
                         <CircularProgress size={40} />
@@ -494,7 +488,6 @@ function VisitCheckIn() {
                       </MDBox>
                     )}
 
-                    {/* Estado inicial */}
                     {!loading && !result && !error && !processingImage && (
                       <MDBox textAlign="center" py={3}>
                         <Icon sx={{ fontSize: 48, color: "text.secondary", mb: 2 }}>
@@ -513,7 +506,7 @@ function VisitCheckIn() {
         </Grid>
       </MDBox>
 
-      {/* Diálogo de pre-registros */}
+      {/* Diálogo de pre-registros (sin cambios) */}
       <Dialog open={showDialog} onClose={() => setShowDialog(false)} maxWidth="md" fullWidth>
         <DialogTitle>
           <MDTypography variant="h4" fontWeight="medium">

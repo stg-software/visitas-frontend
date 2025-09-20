@@ -1,4 +1,5 @@
 /**
+ * src\layouts\visitor-management\index.js
  * Material Dashboard 2 React - v2.1.0
  * Sistema de Control de Visitas
  * Page: Gestión de Visitantes - ACTUALIZADO CON FOTO EN BASE64

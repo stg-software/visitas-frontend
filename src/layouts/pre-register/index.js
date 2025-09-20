@@ -10,13 +10,6 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  TablePagination,
   Chip,
   Alert,
   Tooltip,
@@ -70,7 +63,6 @@ const PreRegisterForm = ({ preRegister, onSave, onCancel, isEdit = false }) => {
     visit_time: "",
     expected_duration_hours: 2,
     additional_notes: "",
-    // NUEVOS CAMPOS DE VEHÍCULO
     vehicle_make: "",
     vehicle_model: "",
     vehicle_license_plate: "",
@@ -92,18 +84,30 @@ const PreRegisterForm = ({ preRegister, onSave, onCancel, isEdit = false }) => {
         visit_time: "10:00",
       }));
     } else {
-      // Si está editando y tiene datos de vehículo, activar el switch
       if (preRegister?.vehicle_license_plate) {
         setIncludesVehicle(true);
       }
     }
   }, [isEdit, preRegister]);
 
+  // 🔹 Nuevo efecto para precargar los valores de visitante y autorizador en edición
+  useEffect(() => {
+    if (isEdit && preRegister) {
+      if (visitors.length > 0 && preRegister.visitor_id) {
+        const v = visitors.find((v) => v.id === preRegister.visitor_id);
+        if (v) setSelectedVisitor(v);
+      }
+      if (authorizers.length > 0 && preRegister.authorizer_id) {
+        const a = authorizers.find((a) => a.id === preRegister.authorizer_id);
+        if (a) setSelectedAuthorizer(a);
+      }
+    }
+  }, [isEdit, preRegister, visitors, authorizers]);
+
   const loadVisitors = async () => {
     setLoadingVisitors(true);
     try {
       const data = await visitorService.getAll();
-      console.log("Visitantes cargados:", data);
       setVisitors(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Error loading visitors:", error);
@@ -117,7 +121,6 @@ const PreRegisterForm = ({ preRegister, onSave, onCancel, isEdit = false }) => {
     setLoadingAuthorizers(true);
     try {
       const data = await userService.getAuthorizers();
-      console.log("Autorizadores cargados:", data);
       setAuthorizers(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Error loading authorizers:", error);
@@ -136,12 +139,31 @@ const PreRegisterForm = ({ preRegister, onSave, onCancel, isEdit = false }) => {
     }
   };
 
-  // NUEVO: Manejar el cambio del switch de vehículo
+  const handleVisitorSelect = (event, newValue) => {
+    setSelectedVisitor(newValue);
+    setFormData((prev) => ({
+      ...prev,
+      visitor_id: newValue?.id || null,
+    }));
+    if (errors.visitor_id) {
+      setErrors((prev) => ({ ...prev, visitor_id: "" }));
+    }
+  };
+
+  const handleAuthorizerSelect = (event, newValue) => {
+    setSelectedAuthorizer(newValue);
+    setFormData((prev) => ({
+      ...prev,
+      authorizer_id: newValue?.id || null,
+    }));
+    if (errors.authorizer_id) {
+      setErrors((prev) => ({ ...prev, authorizer_id: "" }));
+    }
+  };
+
   const handleVehicleToggle = (event) => {
     const checked = event.target.checked;
     setIncludesVehicle(checked);
-
-    // Si desactiva el vehículo, limpiar los campos relacionados
     if (!checked) {
       setFormData((prev) => ({
         ...prev,
@@ -149,8 +171,6 @@ const PreRegisterForm = ({ preRegister, onSave, onCancel, isEdit = false }) => {
         vehicle_model: "",
         vehicle_license_plate: "",
       }));
-
-      // Limpiar errores de vehículo
       setErrors((prev) => {
         const newErrors = { ...prev };
         delete newErrors.vehicle_license_plate;
@@ -159,46 +179,11 @@ const PreRegisterForm = ({ preRegister, onSave, onCancel, isEdit = false }) => {
     }
   };
 
-  const handleVisitorSelect = (event, newValue) => {
-    console.log("Visitante seleccionado:", newValue);
-    setSelectedVisitor(newValue);
-    setFormData((prev) => ({
-      ...prev,
-      visitor_id: newValue?.id || null,
-    }));
-
-    if (errors.visitor_id) {
-      setErrors((prev) => ({ ...prev, visitor_id: "" }));
-    }
-  };
-
-  const handleAuthorizerSelect = (event, newValue) => {
-    console.log("Autorizador seleccionado:", newValue);
-    setSelectedAuthorizer(newValue);
-    setFormData((prev) => ({
-      ...prev,
-      authorizer_id: newValue?.id || null,
-    }));
-
-    if (errors.authorizer_id) {
-      setErrors((prev) => ({ ...prev, authorizer_id: "" }));
-    }
-  };
-
-  // NUEVA FUNCIÓN: Formatear placa mientras se escribe
   const handleLicensePlateChange = (event) => {
     let value = event.target.value;
-
-    // Convertir a mayúsculas y remover caracteres no válidos
     value = value.toUpperCase().replace(/[^A-Z0-9\-]/g, "");
-
-    // Limitar longitud
-    if (value.length > 10) {
-      value = value.substring(0, 10);
-    }
-
+    if (value.length > 10) value = value.substring(0, 10);
     setFormData((prev) => ({ ...prev, vehicle_license_plate: value }));
-
     if (errors.vehicle_license_plate) {
       setErrors((prev) => ({ ...prev, vehicle_license_plate: "" }));
     }
@@ -206,11 +191,9 @@ const PreRegisterForm = ({ preRegister, onSave, onCancel, isEdit = false }) => {
 
   const validateForm = () => {
     const newErrors = {};
-
     if (!formData.visitor_id) {
       newErrors.visitor_id = "Debe seleccionar un visitante";
     }
-
     if (!formData.authorizer_id) {
       newErrors.authorizer_id = "Debe seleccionar un autorizador";
     }
@@ -223,30 +206,22 @@ const PreRegisterForm = ({ preRegister, onSave, onCancel, isEdit = false }) => {
     if (!formData.visit_time) {
       newErrors.visit_time = "La hora de visita es requerida";
     }
-
-    // VALIDACIONES DE VEHÍCULO
     if (includesVehicle) {
       if (!formData.vehicle_license_plate.trim()) {
-        newErrors.vehicle_license_plate =
-          "La placa del vehículo es requerida cuando se incluye vehículo";
+        newErrors.vehicle_license_plate = "La placa es requerida";
       } else if (formData.vehicle_license_plate.length < 6) {
         newErrors.vehicle_license_plate = "La placa debe tener al menos 6 caracteres";
       }
     }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-
-    if (!validateForm()) {
-      return;
-    }
+    if (!validateForm()) return;
 
     setIsSubmitting(true);
-
     try {
       const submitData = {
         visitor_id: formData.visitor_id,
@@ -256,15 +231,12 @@ const PreRegisterForm = ({ preRegister, onSave, onCancel, isEdit = false }) => {
         purpose: formData.visit_purpose.trim(),
         estimated_duration: parseInt(formData.expected_duration_hours) * 60,
         additional_notes: formData.additional_notes.trim() || null,
-        // NUEVOS CAMPOS DE VEHÍCULO (solo si incluye vehículo)
         vehicle_make: includesVehicle ? formData.vehicle_make.trim() || null : null,
         vehicle_model: includesVehicle ? formData.vehicle_model.trim() || null : null,
         vehicle_license_plate: includesVehicle
           ? formData.vehicle_license_plate.trim() || null
           : null,
       };
-
-      console.log("Datos a enviar:", submitData);
       await onSave(submitData);
     } catch (error) {
       console.error("Error submitting form:", error);
@@ -615,27 +587,10 @@ const PreRegisterForm = ({ preRegister, onSave, onCancel, isEdit = false }) => {
         </DialogContent>
 
         <DialogActions>
-          <MDButton
-            onClick={onCancel}
-            variant="outlined"
-            color="secondary"
-            aria-label="Cancelar formulario de pre-registro"
-          >
+          <MDButton onClick={onCancel} variant="outlined" color="secondary">
             Cancelar
           </MDButton>
-          <MDButton
-            type="submit"
-            variant="gradient"
-            color="primary"
-            disabled={isSubmitting}
-            aria-label={
-              isSubmitting
-                ? "Guardando pre-registro..."
-                : isEdit
-                ? "Actualizar pre-registro"
-                : "Crear pre-registro"
-            }
-          >
+          <MDButton type="submit" variant="gradient" color="primary" disabled={isSubmitting}>
             {isSubmitting ? "Guardando..." : isEdit ? "Actualizar" : "Crear"}
           </MDButton>
         </DialogActions>
