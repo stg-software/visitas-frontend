@@ -684,110 +684,376 @@ export const visitorServiceFormData = {
 
 export const visitService = {
   /**
-   * Obtener todas las visitas
-   * @param {Object} filters - Filtros opcionales
+   * Obtener todas las visitas con filtros opcionales
+   * @param {Object} filters - Filtros opcionales (status, skip, limit)
    * @returns {Promise<Array>} Lista de visitas
    */
   async getAll(filters = {}) {
     try {
       console.log("🚪 Loading visits with filters:", filters);
-      const response = await api.get("/visits/", { params: filters });
+
+      // Preparar parámetros de consulta
+      const params = new URLSearchParams();
+      if (filters.skip !== undefined) params.append("skip", filters.skip.toString());
+      if (filters.limit !== undefined) params.append("limit", filters.limit.toString());
+      if (filters.status) params.append("status", filters.status);
+
+      const queryString = params.toString();
+      const url = queryString ? `/visits/?${queryString}` : "/visits/";
+
+      const response = await api.get(url);
       console.log("✅ Visits loaded:", response.data?.length || 0);
       return response.data;
     } catch (error) {
-      console.warn("⚠️ Visits endpoint not available, using mock data");
-
-      // Mock data para desarrollo
-      return [
-        {
-          id: 1,
-          visitor_id: 1,
-          visitor_name: "Juan Pérez",
-          company: "Empresa XYZ",
-          purpose: "Reunión de trabajo",
-          host_name: "Ana García",
-          check_in_time: "2025-09-10T09:00:00Z",
-          check_out_time: "2025-09-10T11:30:00Z",
-          status: "completed",
-          created_at: "2025-09-10T09:00:00Z",
-        },
-        {
-          id: 2,
-          visitor_id: 2,
-          visitor_name: "María López",
-          company: "Tech Solutions",
-          purpose: "Presentación",
-          host_name: "Carlos Ruiz",
-          check_in_time: "2025-09-10T14:00:00Z",
-          check_out_time: null,
-          status: "active",
-          created_at: "2025-09-10T14:00:00Z",
-        },
-        {
-          id: 3,
-          visitor_id: 3,
-          visitor_name: "Pedro Martínez",
-          company: "Consultores ABC",
-          purpose: "Auditoría",
-          host_name: "Luis Hernández",
-          check_in_time: "2025-09-10T10:15:00Z",
-          check_out_time: "2025-09-10T12:45:00Z",
-          status: "completed",
-          created_at: "2025-09-10T10:15:00Z",
-        },
-      ];
+      console.error("❌ Error loading visits:", error);
+      throw new Error(error.response?.data?.detail || "Error al obtener visitas");
     }
   },
 
   /**
-   * Crear nueva visita
-   * @param {Object} visitData - Datos de la visita
-   * @returns {Promise<Object>} Visita creada
-   */
-  async create(visitData) {
-    try {
-      console.log("🚪 Creating visit:", visitData);
-      const response = await api.post("/visits/", visitData);
-      console.log("✅ Visit created:", response.data);
-      return response.data;
-    } catch (error) {
-      console.error("❌ Error creating visit:", error);
-      throw new Error(error.message || "Error al crear la visita");
-    }
-  },
-
-  /**
-   * Finalizar visita (check-out)
-   * @param {number} id - ID de la visita
-   * @returns {Promise<Object>} Visita finalizada
-   */
-  async checkout(id) {
-    try {
-      console.log(`🚪 Checking out visit ${id}`);
-      const response = await api.patch(`/visits/${id}/checkout`);
-      console.log("✅ Visit checked out:", response.data);
-      return response.data;
-    } catch (error) {
-      console.error("❌ Error checking out visit:", error);
-      throw new Error(error.message || "Error al finalizar la visita");
-    }
-  },
-
-  /**
-   * Obtener visitas activas
-   * @returns {Promise<Array>} Visitas activas
+   * Obtener visitas activas únicamente
+   * @returns {Promise<Array>} Lista de visitas activas
    */
   async getActive() {
     try {
       console.log("🚪 Getting active visits");
       const response = await api.get("/visits/active");
+      console.log("✅ Active visits loaded:", response.data?.length || 0);
       return response.data;
     } catch (error) {
       console.warn("⚠️ Active visits endpoint not available, filtering from all visits");
+      // Fallback: obtener todas y filtrar por estado activo
       const allVisits = await this.getAll();
-      return allVisits.filter(
-        (visit) => visit.status === "active" || (!visit.check_out_time && visit.check_in_time)
-      );
+      return allVisits.filter((visit) => visit.status === "active");
+    }
+  },
+
+  /**
+   * Crear nueva visita
+   * @param {Object} visitData - Datos de la visita según VisitCreate schema
+   * @returns {Promise<Object>} Visita creada
+   */
+  async create(visitData) {
+    try {
+      console.log("🚪 Creating visit:", visitData);
+
+      // Validar datos mínimos requeridos
+      if (!visitData.visitor_id) {
+        throw new Error("visitor_id es requerido");
+      }
+      if (!visitData.visit_type) {
+        throw new Error("visit_type es requerido");
+      }
+
+      const response = await api.post("/visits/", visitData);
+      console.log("✅ Visit created:", response.data);
+      return response.data;
+    } catch (error) {
+      console.error("❌ Error creating visit:", error);
+
+      if (error.response?.status === 422) {
+        const validationErrors = error.response.data.detail;
+        console.error("🚨 Validation errors:", validationErrors);
+        throw new Error(`Errores de validación: ${validationErrors.map((e) => e.msg).join(", ")}`);
+      }
+
+      throw new Error(error.response?.data?.detail || "Error al crear la visita");
+    }
+  },
+
+  /**
+   * Obtener visita por ID
+   * @param {number} id - ID de la visita
+   * @returns {Promise<Object>} Visita
+   */
+  async getById(id) {
+    try {
+      console.log(`🚪 Getting visit ${id}`);
+      const response = await api.get(`/visits/${id}`);
+      console.log("✅ Visit retrieved:", response.data);
+      return response.data;
+    } catch (error) {
+      console.error(`❌ Error getting visit ${id}:`, error);
+
+      if (error.response?.status === 404) {
+        throw new Error("Visita no encontrada");
+      }
+
+      throw new Error(error.response?.data?.detail || "Error al obtener la visita");
+    }
+  },
+
+  /**
+   * Actualizar visita
+   * @param {number} id - ID de la visita
+   * @param {Object} updateData - Datos a actualizar según VisitUpdate schema
+   * @returns {Promise<Object>} Visita actualizada
+   */
+  async update(id, updateData) {
+    try {
+      console.log(`🚪 Updating visit ${id}:`, updateData);
+      const response = await api.put(`/visits/${id}`, updateData);
+      console.log("✅ Visit updated:", response.data);
+      return response.data;
+    } catch (error) {
+      console.error(`❌ Error updating visit ${id}:`, error);
+
+      if (error.response?.status === 404) {
+        throw new Error("Visita no encontrada");
+      }
+
+      throw new Error(error.response?.data?.detail || "Error al actualizar la visita");
+    }
+  },
+
+  /**
+   * Completar visita (endpoint específico del backend)
+   * @param {number} id - ID de la visita
+   * @param {string} notes - Notas opcionales de finalización
+   * @returns {Promise<Object>} Visita completada
+   */
+  async completeVisit(id, notes = "") {
+    try {
+      console.log(`🚪 Completing visit ${id} with notes:`, notes);
+
+      // Usar el endpoint específico para completar visitas
+      const response = await api.post(`/visits/${id}/complete`, null, {
+        params: { notes: notes || undefined },
+      });
+
+      console.log("✅ Visit completed:", response.data);
+      return response.data;
+    } catch (error) {
+      console.error(`❌ Error completing visit ${id}:`, error);
+
+      if (error.response?.status === 404) {
+        throw new Error("Visita no encontrada");
+      }
+      if (error.response?.status === 400) {
+        throw new Error(error.response.data?.detail || "La visita ya está completada");
+      }
+
+      throw new Error(error.response?.data?.detail || "Error al completar la visita");
+    }
+  },
+
+  /**
+   * Obtener visitas por visitante
+   * @param {number} visitorId - ID del visitante
+   * @returns {Promise<Array>} Visitas del visitante
+   */
+  async getByVisitor(visitorId) {
+    try {
+      console.log(`🚪 Getting visits for visitor ${visitorId}`);
+      const response = await api.get(`/visits/visitor/${visitorId}`);
+      console.log("✅ Visitor visits loaded:", response.data?.length || 0);
+      return response.data;
+    } catch (error) {
+      console.error(`❌ Error getting visits for visitor ${visitorId}:`, error);
+
+      if (error.response?.status === 404) {
+        throw new Error("Visitante no encontrado");
+      }
+
+      throw new Error(error.response?.data?.detail || "Error al obtener visitas del visitante");
+    }
+  },
+
+  /**
+   * Obtener visitas por vehículo
+   * @param {number} vehicleId - ID del vehículo
+   * @returns {Promise<Array>} Visitas del vehículo
+   */
+  async getByVehicle(vehicleId) {
+    try {
+      console.log(`🚪 Getting visits for vehicle ${vehicleId}`);
+      const response = await api.get(`/visits/vehicle/${vehicleId}`);
+      console.log("✅ Vehicle visits loaded:", response.data?.length || 0);
+      return response.data;
+    } catch (error) {
+      console.error(`❌ Error getting visits for vehicle ${vehicleId}:`, error);
+
+      if (error.response?.status === 404) {
+        throw new Error("Vehículo no encontrado");
+      }
+
+      throw new Error(error.response?.data?.detail || "Error al obtener visitas del vehículo");
+    }
+  },
+
+  /**
+   * Iniciar visita desde pre-registro
+   * @param {number} preRegisterId - ID del pre-registro
+   * @returns {Promise<Object>} Visita iniciada
+   */
+  async startFromPreregister(preRegisterId) {
+    try {
+      console.log(`🚪 Starting visit from pre-register ${preRegisterId}`);
+
+      // Este endpoint podría no existir aún, implementar según necesidades
+      const response = await api.post(`/visits/start-from-preregister/${preRegisterId}`);
+      console.log("✅ Visit started from pre-register:", response.data);
+      return response.data;
+    } catch (error) {
+      console.error(`❌ Error starting visit from pre-register ${preRegisterId}:`, error);
+
+      if (error.response?.status === 404) {
+        throw new Error("Pre-registro no encontrado");
+      }
+      if (error.response?.status === 400) {
+        throw new Error("El pre-registro debe estar aprobado para iniciar la visita");
+      }
+
+      throw new Error(error.response?.data?.detail || "Error al iniciar visita desde pre-registro");
+    }
+  },
+
+  /**
+   * Cancelar visita
+   * @param {number} id - ID de la visita
+   * @param {string} reason - Razón de cancelación
+   * @returns {Promise<Object>} Visita cancelada
+   */
+  async cancel(id, reason = "") {
+    try {
+      console.log(`🚪 Cancelling visit ${id} with reason:`, reason);
+
+      const updateData = {
+        status: "cancelled",
+        notes: reason,
+      };
+
+      const response = await api.put(`/visits/${id}`, updateData);
+      console.log("✅ Visit cancelled:", response.data);
+      return response.data;
+    } catch (error) {
+      console.error(`❌ Error cancelling visit ${id}:`, error);
+      throw new Error(error.response?.data?.detail || "Error al cancelar la visita");
+    }
+  },
+
+  /**
+   * Obtener estadísticas de visitas
+   * @returns {Promise<Object>} Estadísticas
+   */
+  async getStats() {
+    try {
+      console.log("📊 Getting visit stats");
+      const response = await api.get("/visits/stats");
+      console.log("✅ Visit stats loaded:", response.data);
+      return response.data;
+    } catch (error) {
+      console.warn("⚠️ Visit stats endpoint not available, calculating from data");
+
+      try {
+        // Fallback: calcular estadísticas manualmente
+        const allVisits = await this.getAll();
+        const today = new Date().toISOString().split("T")[0];
+
+        const stats = {
+          total: allVisits.length,
+          active: allVisits.filter((v) => v.status === "active").length,
+          completed: allVisits.filter((v) => v.status === "completed").length,
+          cancelled: allVisits.filter((v) => v.status === "cancelled").length,
+          today: allVisits.filter((v) => {
+            if (!v.entry_time) return false;
+            return v.entry_time.startsWith(today);
+          }).length,
+          with_vehicle: allVisits.filter((v) => v.vehicle_id || v.vehicle).length,
+        };
+
+        return stats;
+      } catch (fallbackError) {
+        console.error("❌ Fallback stats calculation failed:", fallbackError);
+
+        // Si todo falla, devolver stats básicos
+        return {
+          total: 0,
+          active: 0,
+          completed: 0,
+          cancelled: 0,
+          today: 0,
+          with_vehicle: 0,
+        };
+      }
+    }
+  },
+
+  /**
+   * Validar datos de visita antes de enviar
+   * @param {Object} visitData - Datos a validar
+   * @returns {Object} Datos validados o errores
+   */
+  validateVisitData(visitData) {
+    const errors = [];
+
+    if (!visitData.visitor_id) {
+      errors.push("visitor_id es requerido");
+    }
+
+    if (!visitData.visit_type) {
+      errors.push("visit_type es requerido");
+    } else if (
+      !["person_only", "vehicle_only", "person_and_vehicle"].includes(visitData.visit_type)
+    ) {
+      errors.push("visit_type debe ser person_only, vehicle_only o person_and_vehicle");
+    }
+
+    if (visitData.visit_type === "vehicle_only" || visitData.visit_type === "person_and_vehicle") {
+      if (!visitData.vehicle_id) {
+        errors.push("vehicle_id es requerido para visitas con vehículo");
+      }
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors,
+    };
+  },
+
+  /**
+   * Formatear datos de visita para mostrar en UI
+   * @param {Object} visit - Datos de la visita del backend
+   * @returns {Object} Datos formateados para UI
+   */
+  async formatVisitForUI(visit) {
+    let visitorData = visit.visitor;
+
+    // Si solo vino visitor_id, cargamos datos con visitorService
+    if (!visitorData && visit.visitor_id) {
+      try {
+        visitorData = await visitorService.getById(visit.visitor_id);
+      } catch (err) {
+        console.warn(`No se pudo cargar visitante ${visit.visitor_id}:`, err);
+      }
+    }
+
+    return {
+      ...visit,
+      check_in_time: visit.entry_time,
+      check_out_time: visit.exit_time,
+      visitor_name: visitorData?.full_name || "Visitante desconocido",
+      visitor_email: visitorData?.email || "",
+      visitor_identification: visitorData
+        ? `${visitorData.identification || ""} ${visitorData.no_identification || ""}`.trim()
+        : "-",
+      visitor_company: visitorData?.company || "-",
+      visitor_phone: visitorData?.phone || "-",
+    };
+  },
+
+  /**
+   * Obtener visitas formateadas para UI
+   * @param {Object} filters - Filtros opcionales
+   * @returns {Promise<Array>} Visitas formateadas
+   */
+  async getAllFormatted(filters = {}) {
+    try {
+      const visits = await this.getAll(filters);
+      return visits.map((visit) => this.formatVisitForUI(visit));
+    } catch (error) {
+      console.error("❌ Error getting formatted visits:", error);
+      throw error;
     }
   },
 };

@@ -29,7 +29,8 @@ import SignUp from "layouts/authentication/sign-up";
 import PreRegisterPage from "layouts/pre-register";
 import VisitorManagement from "layouts/visitor-management";
 import Approvals from "layouts/approvals";
-import VisitCheckIn from "layouts/VisitCheckIn";
+import VisitCheckIn from "layouts/visit-checkIn";
+import VisitsManagement from "layouts/visits-management";
 
 const routes = [
   {
@@ -130,6 +131,20 @@ const routes = [
     icon: <Icon fontSize="small">play_circle_outline</Icon>,
     route: "/visit-check-in",
     component: <VisitCheckIn />,
+    visible: true,
+    requireAuth: true,
+    roles: ["admin", "operator", "user"],
+    showInSidebar: true,
+    showInBreadcrumb: true,
+    isPublic: false,
+  },
+  {
+    type: "collapse",
+    name: "Visitas registradas",
+    key: "visit-registered",
+    icon: <Icon fontSize="small">checklist</Icon>,
+    route: "/visit-registered",
+    component: <VisitsManagement />,
     visible: true,
     requireAuth: true,
     roles: ["admin", "operator", "user"],
