@@ -45,6 +45,20 @@ const EndVisitDialog = ({ visit, isOpen, onClose, onConfirm }) => {
   const [endNotes, setEndNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Función local para obtener el label del estado
+  const getStatusLabel = (status) => {
+    switch (status) {
+      case "active":
+        return "Activa";
+      case "completed":
+        return "Completada";
+      case "cancelled":
+        return "Cancelada";
+      default:
+        return "Desconocido";
+    }
+  };
+
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
@@ -534,17 +548,15 @@ function VisitsManagement() {
               {visitorInfo.name?.charAt(0) || "?"}
             </Avatar>
             <MDBox>
-              <MDTypography variant="body2" fontWeight="medium">
-                {visitorInfo.name}
-              </MDTypography>
+              <MDTypography variant="body2"> {visitorInfo.name} </MDTypography>
               <MDTypography variant="caption" color="text">
                 {visitorInfo.email}
               </MDTypography>
-              {visitorInfo.company && visitorInfo.company !== "-" && (
+              {/* {visitorInfo.company && visitorInfo.company !== "-" && (
                 <MDTypography variant="caption" color="text" display="block">
                   {visitorInfo.company}
                 </MDTypography>
-              )}
+              )} */}
             </MDBox>
           </MDBox>
         );
