@@ -1,5 +1,5 @@
 // src/components/PhotoCapture/index.js
-import React, { useRef, useCallback, useState } from "react";
+import React, { useRef, useCallback, useState, useEffect } from "react";
 import Webcam from "react-webcam";
 import PropTypes from "prop-types";
 
@@ -9,17 +9,51 @@ import MDButton from "components/MDButton";
 import MDTypography from "components/MDTypography";
 import Avatar from "@mui/material/Avatar";
 import Paper from "@mui/material/Paper";
-
-const videoConstraints = {
-  width: 640,
-  height: 480,
-  facingMode: "user",
-};
+import Select from "@mui/material/Select";
+import MenuItem from "@mui/material/MenuItem";
+import FormControl from "@mui/material/FormControl";
+import InputLabel from "@mui/material/InputLabel";
 
 const PhotoCapture = ({ onPhotoCapture, currentPhoto, onClearPhoto }) => {
   const webcamRef = useRef(null);
   const fileInputRef = useRef(null);
   const [dragActive, setDragActive] = useState(false);
+  const [devices, setDevices] = useState([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState("");
+
+  // Obtener lista de dispositivos de cámara
+  const getVideoDevices = useCallback(async () => {
+    try {
+      // Solicitar permisos para acceder a la cámara
+      await navigator.mediaDevices.getUserMedia({ video: true });
+
+      // Obtener todos los dispositivos
+      const mediaDevices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = mediaDevices.filter((device) => device.kind === "videoinput");
+
+      setDevices(videoDevices);
+
+      // Si no hay dispositivo seleccionado, usar el primero disponible
+      if (videoDevices.length > 0 && !selectedDeviceId) {
+        setSelectedDeviceId(videoDevices[0].deviceId);
+      }
+    } catch (error) {
+      console.error("Error al obtener dispositivos de video:", error);
+    }
+  }, [selectedDeviceId]);
+
+  // Cargar dispositivos al montar el componente
+  useEffect(() => {
+    getVideoDevices();
+  }, [getVideoDevices]);
+
+  // Configuración de video con dispositivo seleccionado
+  const videoConstraints = {
+    width: 640,
+    height: 480,
+    facingMode: "user",
+    deviceId: selectedDeviceId ? { exact: selectedDeviceId } : undefined,
+  };
 
   const capture = useCallback(() => {
     const imageSrc = webcamRef.current?.getScreenshot();
@@ -52,11 +86,37 @@ const PhotoCapture = ({ onPhotoCapture, currentPhoto, onClearPhoto }) => {
 
   const handleDragLeave = () => setDragActive(false);
 
+  const handleDeviceChange = (event) => {
+    setSelectedDeviceId(event.target.value);
+  };
+
   return (
     <MDBox>
       <MDTypography variant="h6" gutterBottom>
         Fotografía del Visitante
       </MDTypography>
+
+      {/* Selector de Cámara */}
+      {devices.length > 1 && (
+        <MDBox mb={2}>
+          <FormControl fullWidth size="small">
+            <InputLabel id="camera-select-label">Seleccionar Cámara</InputLabel>
+            <Select
+              labelId="camera-select-label"
+              id="camera-select"
+              value={selectedDeviceId}
+              label="Seleccionar Cámara"
+              onChange={handleDeviceChange}
+            >
+              {devices.map((device, index) => (
+                <MenuItem key={device.deviceId} value={device.deviceId}>
+                  {device.label || `Cámara ${index + 1}`}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </MDBox>
+      )}
 
       {currentPhoto ? (
         <MDBox textAlign="center">
@@ -120,6 +180,15 @@ const PhotoCapture = ({ onPhotoCapture, currentPhoto, onClearPhoto }) => {
               onChange={handleFileChange}
             />
           </Paper>
+        </MDBox>
+      )}
+
+      {/* Información adicional sobre dispositivos */}
+      {devices.length === 0 && (
+        <MDBox mt={2} textAlign="center">
+          <MDTypography variant="caption" color="warning">
+            No se detectaron cámaras disponibles. Verifica los permisos del navegador.
+          </MDTypography>
         </MDBox>
       )}
     </MDBox>
