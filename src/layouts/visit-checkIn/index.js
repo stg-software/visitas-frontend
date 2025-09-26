@@ -209,12 +209,31 @@ function VisitCheckIn() {
   };
 
   // Iniciar visita (igual que original)
+  // Reemplazar la función startVisit en tu archivo index.js
+
   const startVisit = async (preRegistrationId = null) => {
     try {
       setLoading(true);
 
+      // CORRECCIÓN: Obtener visitor_id correctamente según el modo
+      let visitorId = 1; // fallback
+
+      if (mode === "face" && result?.visitor?.id) {
+        // Modo facial: usar el visitor del reconocimiento facial
+        visitorId = result.visitor.id;
+      } else if (mode === "plate" && preRegistrationId) {
+        // Modo placa: obtener visitor_id del pre-registro seleccionado
+        const selectedPreReg = matches.find((m) => m.id === preRegistrationId);
+        if (selectedPreReg && selectedPreReg.visitor_id) {
+          visitorId = selectedPreReg.visitor_id;
+          console.log(`✅ Usando visitor_id ${visitorId} del pre-registro ${preRegistrationId}`);
+        } else {
+          console.warn("⚠️ No se pudo obtener visitor_id del pre-registro");
+        }
+      }
+
       const visitData = {
-        visitor_id: result?.visitor?.id || 1,
+        visitor_id: visitorId,
         visit_type: mode === "face" ? "person_only" : "vehicle_only",
         pre_registration_id: preRegistrationId,
         notes:
@@ -222,6 +241,8 @@ function VisitCheckIn() {
             ? `Check-in facial - ${(result.similarity * 100).toFixed(1)}%`
             : `Check-in vehicular - ${result.plate}`,
       };
+
+      console.log("📤 Enviando datos de visita:", visitData);
 
       await api.post("/visits", visitData);
 
@@ -239,7 +260,7 @@ function VisitCheckIn() {
         setProcessingImage(null);
       }, 3000);
     } catch (err) {
-      console.error("Error:", err);
+      console.error("❌ Error al iniciar visita:", err);
       setError(err.response?.data?.detail || "Error al iniciar visita");
     } finally {
       setLoading(false);
